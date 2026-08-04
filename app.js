@@ -22,7 +22,7 @@ function showStatusMessage(text, isError = false) {
 }
 
 // ==========================================
-// 2. פונקציות עזר לבדיקה והמרת זמנים (מתוקן)
+// 2. פונקציות עזר לבדיקה והמרת זמנים
 // ==========================================
 function parseTimeToMinutes(val) {
     if (!val && val !== 0) return 0;
@@ -108,10 +108,9 @@ async function loadData() {
         const monthPicker = document.getElementById('month-select');
         if (monthPicker) {
             if (!selectedMonth) {
-                // הגדרת חודש תמידית לפי הנתונים ב-data.json או החודש הנוכחי
                 const availableMonths = Object.keys(currentData);
                 if (availableMonths.length > 0) {
-                    selectedMonth = availableMonths[0]; // ייקח את "2026-07"
+                    selectedMonth = availableMonths[0];
                 } else {
                     const now = new Date();
                     selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -150,6 +149,14 @@ function renderDashboard() {
                 totalUnpaid += itemAmount;
             }
 
+            const statusBadgeHTML = `
+                <button type="button" class="badge ${item.isPaid ? 'bg-success' : 'bg-danger'}" 
+                        style="cursor:pointer; border:none; padding: 6px 12px; border-radius: 12px;"
+                        onclick="togglePaymentStatus(${item.id})">
+                    ${item.isPaid ? '✓ שולם' : '✗ טרם שולם'}
+                </button>
+            `;
+
             // 1. רינדור טבלה כללית
             if (mainList) {
                 const tr = document.createElement('tr');
@@ -159,11 +166,7 @@ function renderDashboard() {
                     <td>${item.type || ''}</td>
                     <td>${item.location || ''}</td>
                     <td>₪${itemAmount.toLocaleString()}</td>
-                    <td>
-                        <span class="badge ${item.isPaid ? 'bg-success' : 'bg-danger'}">
-                            ${item.isPaid ? '✓ שולם' : '✗ טרם שולם'}
-                        </span>
-                    </td>
+                    <td>${statusBadgeHTML}</td>
                     <td>
                         <button class="btn-delete" onclick="deleteEvent(${item.id})">🗑️</button>
                     </td>
@@ -175,7 +178,6 @@ function renderDashboard() {
             if (item.isIchilov && ichilovList) {
                 const iData = item.ichilovData || {};
                 
-                // חישוב בטוח של הזמנים
                 const tThere = iData.timeThere || 0;
                 const tBack = iData.timeBack || 0;
                 const totalMins = parseTimeToMinutes(tThere) + parseTimeToMinutes(tBack);
@@ -199,11 +201,7 @@ function renderDashboard() {
                     <td>₪${calc.kmPay || 0}</td>
                     <td>₪${calc.timePay || 0}</td>
                     <td><strong>₪${itemAmount.toLocaleString()}</strong></td>
-                    <td>
-                        <span class="badge ${item.isPaid ? 'bg-success' : 'bg-danger'}">
-                            ${item.isPaid ? '✓ שולם' : '✗ טרם שולם'}
-                        </span>
-                    </td>
+                    <td>${statusBadgeHTML}</td>
                     <td>
                         <button class="btn-delete" onclick="deleteEvent(${item.id})">🗑️</button>
                     </td>
@@ -227,7 +225,35 @@ function renderDashboard() {
 }
 
 // ==========================================
-// 5. ניהול חלון הגדרות GitHub (Modal)
+// 5. שינוי סטטוס תשלום (בלחיצת קליק)
+// ==========================================
+function togglePaymentStatus(id) {
+    const monthEvents = currentData[selectedMonth] || [];
+    const targetEvent = monthEvents.find(item => item.id === id);
+
+    if (!targetEvent) return;
+
+    const newStatus = !targetEvent.isPaid;
+
+    // אם מדובר באירוע של איכילוב - מעדכנים את כל מופעי איכילוב של אותה חודש יחד
+    if (targetEvent.isIchilov || targetEvent.client === 'החברה מאיכילוב') {
+        monthEvents.forEach(item => {
+            if (item.isIchilov || item.client === 'החברה מאיכילוב') {
+                item.isPaid = newStatus;
+            }
+        });
+        showStatusMessage(newStatus ? 'כל מופעי איכילוב לחודש זה סומנו כ"שולם"' : 'כל מופעי איכילוב לחודש זה סומנו כ"טרם שולם"');
+    } else {
+        // אירוע רגיל - שינוי אישי
+        targetEvent.isPaid = newStatus;
+        showStatusMessage(`סטטוס התשלום עבור ${targetEvent.client} עודכן`);
+    }
+
+    renderDashboard();
+}
+
+// ==========================================
+// 6. ניהול חלון הגדרות GitHub (Modal)
 // ==========================================
 function setupModal() {
     const modal = document.getElementById('settings-modal');
@@ -275,7 +301,7 @@ function setupModal() {
 }
 
 // ==========================================
-// 6. ניהול לשוניות (Tabs)
+// 7. ניהול לשוניות (Tabs)
 // ==========================================
 function setupTabs() {
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -293,7 +319,7 @@ function setupTabs() {
 }
 
 // ==========================================
-// 7. הוספה ומחיקה של אירועים
+// 8. הוספה ומחיקה של אירועים
 // ==========================================
 function setupForms() {
     const regularForm = document.getElementById('add-regular-form');
@@ -392,7 +418,7 @@ function deleteEvent(id) {
 }
 
 // ==========================================
-// 8. אתחול האפליקציה בטעינה
+// 9. אתחול האפליקציה בטעינה
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     setupModal();
