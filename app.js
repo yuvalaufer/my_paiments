@@ -1,18 +1,3 @@
-מעולה! עכשיו כשאני רואה את ה-HTML המדויק שלך, ברור לגמרי למה שום דבר לא עבד: השמות של ה-IDs ב-HTML וה-IDs שבקוד ה-JavaScript לא התאימו זה לזה.
-
-הנה קובץ **`app.js` השלם והמלא** שנבנה מחדש בדיוק לפי ה-HTML שלך.
-
-הקובץ כולל:
-
-1. **כפתור הגדרות ומודאל GitHub שעובדים ב-100%** (`#settings-btn`, `#settings-modal`, `#settings-form`).
-2. **מעבר חופשי בין בלשוניות הטפסים** (עבודה רגילה / איכילוב).
-3. **חישוב ותצוגה מקדימה במחשבון איכילוב בזמן אמת** (תמיכה מלאה בפורמט HH:MM ודקות).
-4. **רינדור תקין של הנתונים בטבלאות ובכרטיסי הסיכום** (`#payments-list`, `#ichilov-list`, `#month-select`, `#total-amount` וכו').
-5. **שמירה ומחיקה של אירועים**.
-
-העתק את כל הקוד הבא והחלף את תוכן הקובץ **`app.js`**:
-
-```javascript
 // ==========================================
 // 1. משתנים גלובליים וניהול הגדרות GitHub
 // ==========================================
@@ -37,11 +22,12 @@ function showStatusMessage(text, isError = false) {
 }
 
 // ==========================================
-// 2. פונקציות עזר לבדיקה והמרת זמנים
+// 2. פונקציות עזר לבדיקה והמרת זמנים (מתוקן)
 // ==========================================
 function parseTimeToMinutes(val) {
-    if (!val) return 0;
+    if (!val && val !== 0) return 0;
     if (typeof val === 'number') return val;
+    
     const str = String(val).trim();
     if (str.includes(':')) {
         const parts = str.split(':');
@@ -116,26 +102,27 @@ function updateIchilovPreview() {
 async function loadData() {
     try {
         const response = await fetch('data.json?t=' + Date.now());
-        if (!response.ok) throw new Error("שגיאה שטעינת data.json");
+        if (!response.ok) throw new Error("שגיאה בטעינת data.json");
         currentData = await response.json();
         
-        // הגדרת חודש ברירת מחדל אם לא נבחר
         const monthPicker = document.getElementById('month-select');
         if (monthPicker) {
             if (!selectedMonth) {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                selectedMonth = `${year}-${month}`;
-                monthPicker.value = selectedMonth;
-            } else {
-                monthPicker.value = selectedMonth;
+                // הגדרת חודש תמידית לפי הנתונים ב-data.json או החודש הנוכחי
+                const availableMonths = Object.keys(currentData);
+                if (availableMonths.length > 0) {
+                    selectedMonth = availableMonths[0]; // ייקח את "2026-07"
+                } else {
+                    const now = new Date();
+                    selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                }
             }
+            monthPicker.value = selectedMonth;
         }
         
         renderDashboard();
     } catch (err) {
-        console.error("שגיאה שטעינת הנתונים:", err);
+        console.error("שגיאה בטעינת הנתונים:", err);
         showStatusMessage("שגיאה בטעינת קובץ הנתונים", true);
     }
 }
@@ -184,14 +171,21 @@ function renderDashboard() {
                 mainList.appendChild(tr);
             }
 
-            // 2. רינדור טבלת איכילוב (מי שמשויך לאיכילוב)
+            // 2. רינדור טבלת איכילוב
             if (item.isIchilov && ichilovList) {
                 const iData = item.ichilovData || {};
+                
+                // חישוב בטוח של הזמנים
+                const tThere = iData.timeThere || 0;
+                const tBack = iData.timeBack || 0;
+                const totalMins = parseTimeToMinutes(tThere) + parseTimeToMinutes(tBack);
+                const hoursFormatted = formatMinutesToHHMM(totalMins);
+
                 const calc = iData.calcDetails || calculateIchilov(
                     iData.showType || item.type,
                     iData.kmOneWay || 0,
-                    iData.timeThere || 0,
-                    iData.timeBack || 0
+                    tThere,
+                    tBack
                 );
 
                 const trI = document.createElement('tr');
@@ -200,7 +194,7 @@ function renderDashboard() {
                     <td>${iData.location || item.location || ''}</td>
                     <td>${iData.showType || item.type || ''}</td>
                     <td>${(Number(iData.kmOneWay) || 0) * 2} ק"מ</td>
-                    <td>${calc.totalHoursStr || (iData.timeThere + '+' + iData.timeBack)}</td>
+                    <td>${calc.totalHoursStr || hoursFormatted}</td>
                     <td>₪${calc.basePay || 0}</td>
                     <td>₪${calc.kmPay || 0}</td>
                     <td>₪${calc.timePay || 0}</td>
@@ -302,7 +296,6 @@ function setupTabs() {
 // 7. הוספה ומחיקה של אירועים
 // ==========================================
 function setupForms() {
-    // טופס אירוע רגיל
     const regularForm = document.getElementById('add-regular-form');
     if (regularForm) {
         regularForm.onsubmit = (e) => {
@@ -314,7 +307,7 @@ function setupForms() {
             const amount = parseFloat(document.getElementById('job-amount').value) || 0;
             const isPaid = document.getElementById('job-status').value === 'true';
 
-            const monthKey = date.substring(0, 7); // YYYY-MM
+            const monthKey = date.substring(0, 7);
 
             const newEvent = {
                 id: Date.now(),
@@ -336,10 +329,8 @@ function setupForms() {
         };
     }
 
-    // טופס איכילוב
     const ichilovForm = document.getElementById('add-ichilov-form');
     if (ichilovForm) {
-        // האזנה לשינויים בטופס לצורך עדכון התצוגה המקדימה
         ['ichilov-show-type', 'ichilov-km', 'ichilov-time-there', 'ichilov-time-back'].forEach(id => {
             const input = document.getElementById(id);
             if (input) {
@@ -364,8 +355,8 @@ function setupForms() {
             const newEvent = {
                 id: Date.now(),
                 date,
-                client: 'איכילוב',
-                type: `מופע איכילוב (${showType})`,
+                client: 'החברה מאיכילוב',
+                type: `מופע (${showType})`,
                 location,
                 amount: calc.totalPay,
                 isPaid,
@@ -418,5 +409,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadData();
 });
-
-```
