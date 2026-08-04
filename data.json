@@ -1,4 +1,28 @@
-JSON
-
-
-{}
+{
+  "2026-07": [
+    {
+      "id": 1785874150379,
+      "client": "החברה מאיכילוב",
+      "type": "מופע (רגיל)",
+      "date": "2026-07-01",
+      "amount": 726,
+      "isPaid": false,
+      "isIchilov": true,
+      "ichilovData": {
+        "location": "עדנים",
+        "showType": "רגיל",
+        "kmOneWay": "56",
+        "timeThere": "00:45",
+        "timeBack": "00:50",
+        "calcDetails": {
+          "basePay": 670,
+          "kmPay": 56,
+          "timePay": 0,
+          "totalPay": 726,
+          "totalHoursStr": "1:35",
+          "excessHoursStr": "0:00"
+        }
+      }
+    }
+  ]
+}
