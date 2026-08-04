@@ -1,22 +1,32 @@
 // ==========================================
-// 1. פונקציות עזר לבדיקה והמרת נתונים
+// 1. משתנים גלובליים וניהול GitHub
 // ==========================================
+let currentData = {};
+let selectedMonth = "2026-07";
 
-// המרת זמנים (HH:MM או מספר) לדקות באופן בטוח
+function getGithubConfig() {
+    return {
+        token: localStorage.getItem('gh_token') || '',
+        owner: localStorage.getItem('gh_owner') || '',
+        repo: localStorage.getItem('gh_repo') || '',
+        path: localStorage.getItem('gh_path') || 'data.json'
+    };
+}
+
+// ==========================================
+// 2. פונקציות עזר לטיפול בזמנים
+// ==========================================
 function parseTimeToMinutes(val) {
     if (!val) return 0;
     if (typeof val === 'number') return val;
     const str = String(val).trim();
     if (str.includes(':')) {
         const parts = str.split(':');
-        const hrs = parseInt(parts[0], 10) || 0;
-        const mins = parseInt(parts[1], 10) || 0;
-        return (hrs * 60) + mins;
+        return (parseInt(parts[0], 10) * 60) + (parseInt(parts[1], 10) || 0);
     }
     return parseFloat(str) || 0;
 }
 
-// המרת דקות חזרה לפורמט תצוגה HH:MM
 function formatMinutesToHHMM(totalMinutes) {
     if (isNaN(totalMinutes) || totalMinutes <= 0) return "0:00";
     const hrs = Math.floor(totalMinutes / 60);
@@ -25,7 +35,7 @@ function formatMinutesToHHMM(totalMinutes) {
 }
 
 // ==========================================
-// 2. חישוב מופעי איכילוב (לוגיקה בטוחה)
+// 3. חישוב מופעי איכילוב (לוגיקה בטוחה)
 // ==========================================
 function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const km = parseFloat(kmOneWay) || 0;
@@ -35,15 +45,12 @@ function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const tBackMins = parseTimeToMinutes(timeBack);
     const totalMins = tThereMins + tBackMins;
 
-    // שכר בסיס
     let basePay = 670;
     if (showType === "ארוך") basePay = 840;
     else if (showType === "זוגי") basePay = 250;
 
-    // תשלום קילומטראז'
     const kmPay = totalKm; 
 
-    // תשלום זמן עודף (מעל 90 דקות)
     let excessMins = 0;
     let timePay = 0;
     if (totalMins > 90) {
@@ -64,19 +71,16 @@ function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
 }
 
 // ==========================================
-// 3. טעינה ורינדור הנתונים (Render)
+// 4. טעינה ורינדור הנתונים
 // ==========================================
-let currentData = {};
-let selectedMonth = "2026-07";
-
 async function loadData() {
     try {
-        const response = await fetch('data.json');
-        if (!response.ok) throw new Error("לא ניתן שטען את data.json");
+        const response = await fetch('data.json?t=' + Date.now());
+        if (!response.ok) throw new Error("לא ניתן לטעון את data.json");
         currentData = await response.json();
         renderDashboard();
     } catch (err) {
-        console.error("שגיאה שטעינת הנתונים:", err);
+        console.error("שגיאה בטעינת הנתונים:", err);
     }
 }
 
@@ -95,7 +99,6 @@ function renderDashboard() {
 
     events.forEach(item => {
         try {
-            // חישוב סכומים לכרטיסי הסיכום העליונים
             const itemAmount = Number(item.amount) || 0;
             totalAll += itemAmount;
             if (item.isPaid) {
@@ -104,7 +107,7 @@ function renderDashboard() {
                 totalUnpaid += itemAmount;
             }
 
-            // 1. רינדור טבלה כללית
+            // 1. טבלה כללית
             if (mainTableBody) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -125,7 +128,7 @@ function renderDashboard() {
                 mainTableBody.appendChild(tr);
             }
 
-            // 2. רינדור טבלת איכילוב (מי שמשויך לאיכילוב)
+            // 2. טבלת איכילוב
             if (item.isIchilov && ichilovTableBody) {
                 const iData = item.ichilovData || {};
                 const calc = iData.calcDetails || calculateIchilov(
@@ -159,11 +162,10 @@ function renderDashboard() {
             }
 
         } catch (itemErr) {
-            console.error("שגיאה ברינדור שורה ספציפית:", item, itemErr);
+            console.error("שגיאה ברינדור שורה:", item, itemErr);
         }
     });
 
-    // עדכון כרטיסי הסיכום בחלק העליון
     updateCardValues(totalAll, totalPaid, totalUnpaid);
 }
 
@@ -177,18 +179,77 @@ function updateCardValues(total, paid, unpaid) {
     if (elUnpaid) elUnpaid.textContent = `₪${unpaid.toLocaleString()}`;
 }
 
-// שינוי חודש בתפריט הנגלל
+// ==========================================
+// 5. ניהול חלון הגדרות (Modal) והגדרות GitHub
+// ==========================================
+function openSettingsModal() {
+    const config = getGithubConfig();
+    document.getElementById('ghTokenInput').value = config.token;
+    document.getElementById('ghOwnerInput').value = config.owner;
+    document.getElementById('ghRepoInput').value = config.repo;
+    document.getElementById('ghPathInput').value = config.path;
+
+    const modalEl = document.getElementById('settingsModal');
+    if (modalEl) {
+        if (typeof bootstrap !== 'undefined') {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        } else {
+            modalEl.style.display = 'block';
+        }
+    }
+}
+
+function saveGithubSettings() {
+    const token = document.getElementById('ghTokenInput').value.trim();
+    const owner = document.getElementById('ghOwnerInput').value.trim();
+    const repo = document.getElementById('ghRepoInput').value.trim();
+    const path = document.getElementById('ghPathInput').value.trim() || 'data.json';
+
+    localStorage.setItem('gh_token', token);
+    localStorage.setItem('gh_owner', owner);
+    localStorage.setItem('gh_repo', repo);
+    localStorage.setItem('gh_path', path);
+
+    alert('ההגדרות נשמרו בהצלחה!');
+
+    const modalEl = document.getElementById('settingsModal');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+        const modal = bootstrap.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+}
+
+// ==========================================
+// 6. שמירה ומחיקה (פונקציות תפעול)
+// ==========================================
+function deleteEvent(id) {
+    if (!confirm("האם אתה בטוח שברצונך למחוק אירוע זה?")) return;
+    if (currentData[selectedMonth]) {
+        currentData[selectedMonth] = currentData[selectedMonth].filter(item => item.id !== id);
+        renderDashboard();
+    }
+}
+
 function onMonthChange(event) {
     selectedMonth = event.target.value;
     renderDashboard();
 }
 
-// הפעלה בטעינת העמוד
+// ==========================================
+// 7. ארועים בעת טעינת העמוד
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
-    
+
     const monthPicker = document.getElementById('monthPicker');
     if (monthPicker) {
         monthPicker.addEventListener('change', onMonthChange);
+    }
+
+    // חיבור כפתור ההגדרות למודאל
+    const settingsBtn = document.getElementById('settingsBtn') || document.querySelector('[onclick*="settings"]');
+    if (settingsBtn) {
+        settingsBtn.onclick = openSettingsModal;
     }
 });
