@@ -1,3 +1,14 @@
+זה **שינוי קטן וקל מאוד**! אין צורך לשנות את המבנה של התוכנית, אלא רק את הדרך שבה התא מציג את האפשרות (תפריט נפתח `<select>` במקום תגית לחיצה).
+
+ברגע שתהפוך את זה לרשימה נפתחת (Dropdown):
+
+1. **לא יהיו שינויים בטעות בלחיצה מקרית** (חייבים לפתוח ולבחור).
+2. הסטטוס עדיין ישתנה מידית ברגע שתבחר אפשרות, בדיוק כמו קודם (כולל עדכון גורף לכל אירועי איכילוב של אותו חודש).
+3. הרשימה תקבל צבע נחמד (ירוק ל"שולם", אדום ל"טרם שולם") כדי לשמור על המראה הנקי.
+
+הנה הקוד המעודכן לקובץ **`app.js`**:
+
+```javascript
 // ==========================================
 // 1. משתנים גלובליים וניהול הגדרות GitHub
 // ==========================================
@@ -149,11 +160,13 @@ function renderDashboard() {
                 totalUnpaid += itemAmount;
             }
 
-            const statusBadgeHTML = `
-                <span class="badge ${item.isPaid ? 'bg-success' : 'bg-danger'}" 
-                      style="cursor:pointer; display:inline-block; padding: 6px 14px; border-radius: 12px; font-weight: bold; user-select: none;">
-                    ${item.isPaid ? '✓ שולם' : '✗ טרם שולם'}
-                </span>
+            // יצירת תפריט בחירה (Select Dropdown) במקום בלחיצה
+            const statusSelectHTML = `
+                <select onchange="window.handleStatusChange(${item.id}, this.value)" 
+                        style="padding: 4px 8px; border-radius: 8px; border: 1px solid #ccc; font-weight: bold; cursor: pointer; background-color: ${item.isPaid ? '#d4edda' : '#f8d7da'}; color: ${item.isPaid ? '#155724' : '#721c24'};">
+                    <option value="false" ${!item.isPaid ? 'selected' : ''}>✗ טרם שולם</option>
+                    <option value="true" ${item.isPaid ? 'selected' : ''}>✓ שולם</option>
+                </select>
             `;
 
             // 1. רינדור טבלה כללית
@@ -165,8 +178,8 @@ function renderDashboard() {
                     <td>${item.type || ''}</td>
                     <td>${item.location || ''}</td>
                     <td>₪${itemAmount.toLocaleString()}</td>
-                    <td onclick="window.togglePaymentStatus(${item.id})" style="cursor:pointer;" title="לחץ לשינוי סטטוס">
-                        ${statusBadgeHTML}
+                    <td>
+                        ${statusSelectHTML}
                     </td>
                     <td>
                         <button class="btn-delete" onclick="window.deleteEvent(${item.id})">🗑️</button>
@@ -202,8 +215,8 @@ function renderDashboard() {
                     <td>₪${calc.kmPay || 0}</td>
                     <td>₪${calc.timePay || 0}</td>
                     <td><strong>₪${itemAmount.toLocaleString()}</strong></td>
-                    <td onclick="window.togglePaymentStatus(${item.id})" style="cursor:pointer;" title="לחץ לשינוי סטטוס איכילוב החודשי">
-                        ${statusBadgeHTML}
+                    <td>
+                        ${statusSelectHTML}
                     </td>
                     <td>
                         <button class="btn-delete" onclick="window.deleteEvent(${item.id})">🗑️</button>
@@ -228,17 +241,17 @@ function renderDashboard() {
 }
 
 // ==========================================
-// 5. שינוי סטטוס תשלום (חשיפה גלובלית ל-window)
+// 5. שינוי סטטוס תשלום מתוך הרשימה הנפתחת
 // ==========================================
-window.togglePaymentStatus = function(id) {
+window.handleStatusChange = function(id, value) {
     const monthEvents = currentData[selectedMonth] || [];
     const targetEvent = monthEvents.find(item => item.id === id);
 
     if (!targetEvent) return;
 
-    const newStatus = !targetEvent.isPaid;
+    const newStatus = (value === 'true');
 
-    // עדכון גורף לאיכילוב
+    // עדכון גורף לאיכילוב במידה ומדובר במופע איכילוב
     if (targetEvent.isIchilov || targetEvent.client === 'החברה מאיכילוב') {
         monthEvents.forEach(item => {
             if (item.isIchilov || item.client === 'החברה מאיכילוב') {
@@ -438,3 +451,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadData();
 });
+
+```
