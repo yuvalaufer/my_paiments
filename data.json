@@ -23,6 +23,30 @@
           "excessHoursStr": "0:00"
         }
       }
+    },
+    {
+      "id": 1785874209234,
+      "client": "החברה מאיכילוב",
+      "type": "מופע (ארוך)",
+      "date": "2026-07-19",
+      "amount": 1098,
+      "isPaid": false,
+      "isIchilov": true,
+      "ichilovData": {
+        "location": "מבואות חרמון",
+        "showType": "ארוך",
+        "kmOneWay": "118",
+        "timeThere": "01:35",
+        "timeBack": "02:20",
+        "calcDetails": {
+          "basePay": 840,
+          "kmPay": 118,
+          "timePay": 140,
+          "totalPay": 1098,
+          "totalHoursStr": "3:55",
+          "excessHoursStr": "1:55"
+        }
+      }
     }
   ]
 }
