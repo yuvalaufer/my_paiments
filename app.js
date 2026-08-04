@@ -150,11 +150,10 @@ function renderDashboard() {
             }
 
             const statusBadgeHTML = `
-                <button type="button" class="badge ${item.isPaid ? 'bg-success' : 'bg-danger'}" 
-                        style="cursor:pointer; border:none; padding: 6px 12px; border-radius: 12px;"
-                        onclick="togglePaymentStatus(${item.id})">
+                <span class="badge ${item.isPaid ? 'bg-success' : 'bg-danger'}" 
+                      style="cursor:pointer; display:inline-block; padding: 6px 14px; border-radius: 12px; font-weight: bold; user-select: none;">
                     ${item.isPaid ? '✓ שולם' : '✗ טרם שולם'}
-                </button>
+                </span>
             `;
 
             // 1. רינדור טבלה כללית
@@ -166,9 +165,11 @@ function renderDashboard() {
                     <td>${item.type || ''}</td>
                     <td>${item.location || ''}</td>
                     <td>₪${itemAmount.toLocaleString()}</td>
-                    <td>${statusBadgeHTML}</td>
+                    <td onclick="window.togglePaymentStatus(${item.id})" style="cursor:pointer;" title="לחץ לשינוי סטטוס">
+                        ${statusBadgeHTML}
+                    </td>
                     <td>
-                        <button class="btn-delete" onclick="deleteEvent(${item.id})">🗑️</button>
+                        <button class="btn-delete" onclick="window.deleteEvent(${item.id})">🗑️</button>
                     </td>
                 `;
                 mainList.appendChild(tr);
@@ -201,9 +202,11 @@ function renderDashboard() {
                     <td>₪${calc.kmPay || 0}</td>
                     <td>₪${calc.timePay || 0}</td>
                     <td><strong>₪${itemAmount.toLocaleString()}</strong></td>
-                    <td>${statusBadgeHTML}</td>
+                    <td onclick="window.togglePaymentStatus(${item.id})" style="cursor:pointer;" title="לחץ לשינוי סטטוס איכילוב החודשי">
+                        ${statusBadgeHTML}
+                    </td>
                     <td>
-                        <button class="btn-delete" onclick="deleteEvent(${item.id})">🗑️</button>
+                        <button class="btn-delete" onclick="window.deleteEvent(${item.id})">🗑️</button>
                     </td>
                 `;
                 ichilovList.appendChild(trI);
@@ -225,9 +228,9 @@ function renderDashboard() {
 }
 
 // ==========================================
-// 5. שינוי סטטוס תשלום (בלחיצת קליק)
+// 5. שינוי סטטוס תשלום (חשיפה גלובלית ל-window)
 // ==========================================
-function togglePaymentStatus(id) {
+window.togglePaymentStatus = function(id) {
     const monthEvents = currentData[selectedMonth] || [];
     const targetEvent = monthEvents.find(item => item.id === id);
 
@@ -235,7 +238,7 @@ function togglePaymentStatus(id) {
 
     const newStatus = !targetEvent.isPaid;
 
-    // אם מדובר באירוע של איכילוב - מעדכנים את כל מופעי איכילוב של אותה חודש יחד
+    // עדכון גורף לאיכילוב
     if (targetEvent.isIchilov || targetEvent.client === 'החברה מאיכילוב') {
         monthEvents.forEach(item => {
             if (item.isIchilov || item.client === 'החברה מאיכילוב') {
@@ -244,13 +247,22 @@ function togglePaymentStatus(id) {
         });
         showStatusMessage(newStatus ? 'כל מופעי איכילוב לחודש זה סומנו כ"שולם"' : 'כל מופעי איכילוב לחודש זה סומנו כ"טרם שולם"');
     } else {
-        // אירוע רגיל - שינוי אישי
+        // אירוע רגיל
         targetEvent.isPaid = newStatus;
         showStatusMessage(`סטטוס התשלום עבור ${targetEvent.client} עודכן`);
     }
 
     renderDashboard();
-}
+};
+
+window.deleteEvent = function(id) {
+    if (!confirm("האם אתה בטוח שברצונך למחוק אירוע זה?")) return;
+    if (currentData[selectedMonth]) {
+        currentData[selectedMonth] = currentData[selectedMonth].filter(item => item.id !== id);
+        renderDashboard();
+        showStatusMessage('האירוע נמחק');
+    }
+};
 
 // ==========================================
 // 6. ניהול חלון הגדרות GitHub (Modal)
@@ -319,7 +331,7 @@ function setupTabs() {
 }
 
 // ==========================================
-// 8. הוספה ומחיקה של אירועים
+// 8. הוספת אירועים
 // ==========================================
 function setupForms() {
     const regularForm = document.getElementById('add-regular-form');
@@ -405,15 +417,6 @@ function setupForms() {
             updateIchilovPreview();
             showStatusMessage('מופע איכילוב נוסף בהצלחה!');
         };
-    }
-}
-
-function deleteEvent(id) {
-    if (!confirm("האם אתה בטוח שברצונך למחוק אירוע זה?")) return;
-    if (currentData[selectedMonth]) {
-        currentData[selectedMonth] = currentData[selectedMonth].filter(item => item.id !== id);
-        renderDashboard();
-        showStatusMessage('האירוע נמחק');
     }
 }
 
