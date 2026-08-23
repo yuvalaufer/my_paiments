@@ -17,9 +17,16 @@ function showStatusMessage(text, isError = false) {
     const statusEl = document.getElementById('status-message');
     if (statusEl) {
         statusEl.textContent = text;
-        statusEl.style.color = isError ? '#d9534f' : '#5cb85c';
-        setTimeout(() => { statusEl.textContent = ''; }, 4000);
+        statusEl.style.color = isError ? '#d9534f' : '#28a745';
+        setTimeout(() => { statusEl.textContent = ''; }, 5000);
     }
+}
+
+// פונקציות עזר לקידוד UTF-8 ב-Base64 בשביל עברית
+function utf8ToBase64(str) {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+        return String.fromCharCode('0x' + p1);
+    }));
 }
 
 // ==========================================
@@ -224,7 +231,6 @@ function renderDashboard() {
     if (elPaid) elPaid.textContent = `₪${totalPaid.toLocaleString()}`;
     if (elUnpaid) elUnpaid.textContent = `₪${totalUnpaid.toLocaleString()}`;
 
-    // הצגת/הסתרת כפתור שמירה במידה ויש שינויים
     renderSaveButton();
 }
 
@@ -242,8 +248,8 @@ function renderSaveButton() {
     if (hasUnsavedChanges) {
         saveBtnContainer.innerHTML = `
             <button onclick="window.saveAllChanges()" 
-                    style="background-color: #28a745; color: white; padding: 12px 28px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                💾 שמור שינויים
+                    style="background-color: #28a745; color: white; padding: 12px 28px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.15);">
+                💾 שמור שינויים ל-GitHub
             </button>
         `;
     } else {
@@ -252,7 +258,7 @@ function renderSaveButton() {
 }
 
 // ==========================================
-// 5. שינוי סטטוס תשלום + שמירה ל-GitHub/Local
+// 5. שינוי סטטוס תשלום + שמירה מתוקנת ל-GitHub
 // ==========================================
 window.handleStatusChange = function(id, value) {
     const monthEvents = currentData[selectedMonth] || [];
@@ -280,54 +286,61 @@ window.handleStatusChange = function(id, value) {
 window.saveAllChanges = async function() {
     const config = getGithubConfig();
 
-    if (config.username && config.repo && config.token) {
-        showStatusMessage('שומר שינויים ב-GitHub...');
-        try {
-            const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
-            
-            // 1. קבלת ה-SHA הנוכחי של הקובץ
-            const getRes = await fetch(url, {
-                headers: { 'Authorization': `token ${config.token}` }
-            });
-            const getData = await getRes.json();
-            const sha = getData.sha;
+    if (!config.username || !config.repo || !config.token) {
+        showStatusMessage('חסרים פרטי התחברות ל-GitHub (משתמש/מאגר/טוקן). בדוק בהגדרות.', true);
+        return;
+    }
 
-            // 2. עדכון הקובץ ב-GitHub
-            const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(currentData, null, 2))));
-            
-            const putRes = await fetch(url, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${config.token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: 'עדכון סטטוס תשלומים מהאפליקציה',
-                    content: contentEncoded,
-                    sha: sha
-                })
-            });
+    showStatusMessage('שומר שינויים ב-GitHub...');
 
-            if (putRes.ok) {
-                hasUnsavedChanges = false;
-                renderDashboard();
-                showStatusMessage('השינויים נשמרו בהצלחה ב-GitHub!');
-            } else {
-                throw new Error('שגיאה בשמירה ל-GitHub');
+    try {
+        const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
+        
+        // 1. קבלת ה-SHA הנוכחי של הקובץ מ-GitHub
+        const getRes = await fetch(url, {
+            headers: { 
+                'Authorization': `token ${config.token}`,
+                'Accept': 'application/vnd.github.v3+json'
             }
-        } catch (err) {
-            console.error(err);
-            showStatusMessage('שגיאה בתקשורת מול GitHub. המידע נשמר מקומית בדפדפן.', true);
-            localStorage.setItem('local_data_backup', JSON.stringify(currentData));
+        });
+
+        if (!getRes.ok) {
+            throw new Error(`שגיאה בשליפת קובץ מ-GitHub (${getRes.status})`);
+        }
+
+        const getData = await getRes.json();
+        const sha = getData.sha;
+
+        // 2. המרת ה-JSON למחרוזת וקידוד נכון בעברית ל-Base64
+        const jsonString = JSON.stringify(currentData, null, 2);
+        const contentEncoded = utf8ToBase64(jsonString);
+
+        // 3. עדכון הקובץ ב-Commit
+        const putRes = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${config.token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/vnd.github.v3+json'
+            },
+            body: JSON.stringify({
+                message: 'עדכון סטטוס תשלומים מתוך ה-Dashboard',
+                content: contentEncoded,
+                sha: sha
+            })
+        });
+
+        if (putRes.ok) {
             hasUnsavedChanges = false;
             renderDashboard();
+            showStatusMessage('השינויים נשמרו בהצלחה ב-GitHub!');
+        } else {
+            const errData = await putRes.json();
+            throw new Error(errData.message || 'שגיאה בשמירה ל-GitHub');
         }
-    } else {
-        // אם לא מוגדר GitHub - שומר ב-LocalStorage
-        localStorage.setItem('local_data_backup', JSON.stringify(currentData));
-        hasUnsavedChanges = false;
-        renderDashboard();
-        showStatusMessage('השינויים נשמרו מקומית בדפדפן (לא מוגדר GitHub Token)');
+    } catch (err) {
+        console.error("GitHub Save Error:", err);
+        showStatusMessage(`שגיאה בשמירה: ${err.message}`, true);
     }
 };
 
