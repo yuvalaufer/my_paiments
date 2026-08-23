@@ -12,7 +12,6 @@ function getGithubConfig() {
     };
 }
 
-// פונקציית חיווי צפה (Popup / Toast Notification)
 function showToast(message, isError = false) {
     let toast = document.getElementById('toast-notification');
     if (!toast) {
@@ -133,18 +132,26 @@ async function loadData() {
     try {
         const response = await fetch('data.json?nocache=' + Date.now());
         if (!response.ok) throw new Error("שגיאה בטעינת data.json");
-        currentData = await response.json();
+        
+        const fetchedData = await response.json();
+        
+        // הגנה: בדיקה שהמידע שהתקבל תקין ואינו ריק
+        if (fetchedData && typeof fetchedData === 'object') {
+            currentData = fetchedData;
+        } else {
+            throw new Error("קובץ הנתונים שחזר אינו במבנה תקין");
+        }
         
         const monthPicker = document.getElementById('month-select');
         if (monthPicker) {
-            if (!selectedMonth) {
-                const availableMonths = Object.keys(currentData);
-                if (availableMonths.length > 0) {
+            const availableMonths = Object.keys(currentData);
+            if (availableMonths.length > 0) {
+                if (!selectedMonth || !currentData[selectedMonth]) {
                     selectedMonth = availableMonths[0];
-                } else {
-                    const now = new Date();
-                    selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
                 }
+            } else {
+                const now = new Date();
+                selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             }
             monthPicker.value = selectedMonth;
         }
@@ -152,7 +159,7 @@ async function loadData() {
         renderDashboard();
     } catch (err) {
         console.error("שגיאה בטעינת הנתונים:", err);
-        showToast("שגיאה בטעינת קובץ הנתונים", true);
+        showToast("שגיאה בטעינת הנתונים מ-data.json", true);
     }
 }
 
@@ -244,7 +251,6 @@ function renderDashboard() {
         }
     });
 
-    // עדכון כרטיסי הסיכום
     const elTotal = document.getElementById('total-amount');
     const elPaid = document.getElementById('paid-amount');
     const elUnpaid = document.getElementById('unpaid-amount');
@@ -255,13 +261,18 @@ function renderDashboard() {
 }
 
 // ==========================================
-// 5. שמירת שינויים ישר ל-GitHub + חיווי Visual
+// 5. שמירת שינויים ישר ל-GitHub
 // ==========================================
 async function saveToGithub() {
     const config = getGithubConfig();
 
     if (!config.username || !config.repo || !config.token) {
         showToast('הגדרות GitHub חסרות - השינוי עודכן מקומית בלבד', true);
+        return;
+    }
+
+    if (!currentData || Object.keys(currentData).length === 0) {
+        showToast('אזהרה: ניסיון לשמור מבנה נתונים ריק נחסם', true);
         return;
     }
 
@@ -293,7 +304,7 @@ async function saveToGithub() {
                 'Accept': 'application/vnd.github.v3+json'
             },
             body: JSON.stringify({
-                message: 'עדכון סטטוס תשלום מתוך האפליקציה',
+                message: 'עדכון נתונים מתוך האפליקציה',
                 content: contentEncoded,
                 sha: sha
             })
