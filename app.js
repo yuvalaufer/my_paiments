@@ -28,7 +28,7 @@ function showToast(message, isError = false) {
             font-size: 15px;
             z-index: 9999;
             box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            transition: opacity 0.3s ease, transform 0.3s ease;
+            transition: opacity 0.3s ease;
             text-align: center;
         `;
         document.body.appendChild(toast);
@@ -44,10 +44,8 @@ function showToast(message, isError = false) {
     }, 2500);
 }
 
-function utf8ToBase64(str) {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
-        return String.fromCharCode('0x' + p1);
-    }));
+function encodeUnicodeToBase64(str) {
+    return btoa(unescape(encodeURIComponent(str)));
 }
 
 // ==========================================
@@ -130,18 +128,23 @@ function updateIchilovPreview() {
 // ==========================================
 async function loadData() {
     try {
-        const response = await fetch('data.json?nocache=' + Date.now());
-        if (!response.ok) throw new Error("שגיאה בטעינת data.json");
+        // גילוי הנתיב היחסי המלא למניעת שגיאות 404 ב-GitHub Pages
+        const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+        const dataUrl = `${basePath}data.json?t=${Date.now()}`;
         
-        const fetchedData = await response.json();
+        let response = await fetch(dataUrl, { cache: 'no-store' });
         
-        // הגנה: בדיקה שהמידע שהתקבל תקין ואינו ריק
-        if (fetchedData && typeof fetchedData === 'object') {
-            currentData = fetchedData;
-        } else {
-            throw new Error("קובץ הנתונים שחזר אינו במבנה תקין");
+        // ניסיון גיבוי לנתיב ישיר במידה והראשון נכשל
+        if (!response.ok) {
+            response = await fetch(`data.json?t=${Date.now()}`, { cache: 'no-store' });
         }
-        
+
+        if (!response.ok) {
+            throw new Error(`קובץ data.json לא נמצא (קוד שגיאה: ${response.status})`);
+        }
+
+        currentData = await response.json();
+
         const monthPicker = document.getElementById('month-select');
         if (monthPicker) {
             const availableMonths = Object.keys(currentData);
@@ -155,17 +158,17 @@ async function loadData() {
             }
             monthPicker.value = selectedMonth;
         }
-        
+
         renderDashboard();
     } catch (err) {
         console.error("שגיאה בטעינת הנתונים:", err);
-        showToast("שגיאה בטעינת הנתונים מ-data.json", true);
+        showToast(`שגיאה בטעינת הנתונים: ${err.message}`, true);
     }
 }
 
 function renderDashboard() {
     const events = currentData[selectedMonth] || [];
-    
+
     let totalAll = 0;
     let totalPaid = 0;
     let totalUnpaid = 0;
@@ -194,7 +197,6 @@ function renderDashboard() {
                 </select>
             `;
 
-            // 1. רינדור טבלה כללית
             if (mainList) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -211,7 +213,6 @@ function renderDashboard() {
                 mainList.appendChild(tr);
             }
 
-            // 2. רינדור טבלת איכילוב
             if (item.isIchilov && ichilovList) {
                 const iData = item.ichilovData || {};
                 
@@ -261,18 +262,13 @@ function renderDashboard() {
 }
 
 // ==========================================
-// 5. שמירת שינויים ישר ל-GitHub
+// 5. שמירת שינויים ב-GitHub
 // ==========================================
 async function saveToGithub() {
     const config = getGithubConfig();
 
     if (!config.username || !config.repo || !config.token) {
-        showToast('הגדרות GitHub חסרות - השינוי עודכן מקומית בלבד', true);
-        return;
-    }
-
-    if (!currentData || Object.keys(currentData).length === 0) {
-        showToast('אזהרה: ניסיון לשמור מבנה נתונים ריק נחסם', true);
+        showToast('הגדרות GitHub חסרות - השינוי נשמר מקומית בלבד', true);
         return;
     }
 
@@ -288,13 +284,13 @@ async function saveToGithub() {
             }
         });
 
-        if (!getRes.ok) throw new Error(`שגיאה בשליפת קובץ (${getRes.status})`);
+        if (!getRes.ok) throw new Error(`שגיאה בשליפת הקובץ מ-GitHub (${getRes.status})`);
 
         const getData = await getRes.json();
         const sha = getData.sha;
 
         const jsonString = JSON.stringify(currentData, null, 2);
-        const contentEncoded = utf8ToBase64(jsonString);
+        const contentEncoded = encodeUnicodeToBase64(jsonString);
 
         const putRes = await fetch(url, {
             method: 'PUT',
