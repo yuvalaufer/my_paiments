@@ -128,19 +128,11 @@ function updateIchilovPreview() {
 // ==========================================
 async function loadData() {
     try {
-        // גילוי הנתיב היחסי המלא למניעת שגיאות 404 ב-GitHub Pages
-        const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-        const dataUrl = `${basePath}data.json?t=${Date.now()}`;
+        // קריאה נקייה ובסיסית לקובץ המקומי
+        const response = await fetch('data.json');
         
-        let response = await fetch(dataUrl, { cache: 'no-store' });
-        
-        // ניסיון גיבוי לנתיב ישיר במידה והראשון נכשל
         if (!response.ok) {
-            response = await fetch(`data.json?t=${Date.now()}`, { cache: 'no-store' });
-        }
-
-        if (!response.ok) {
-            throw new Error(`קובץ data.json לא נמצא (קוד שגיאה: ${response.status})`);
+            throw new Error(`שגיאת HTTP ${response.status}`);
         }
 
         currentData = await response.json();
@@ -162,7 +154,7 @@ async function loadData() {
         renderDashboard();
     } catch (err) {
         console.error("שגיאה בטעינת הנתונים:", err);
-        showToast(`שגיאה בטעינת הנתונים: ${err.message}`, true);
+        showToast("שגיאה בטעינת data.json", true);
     }
 }
 
