@@ -3,6 +3,7 @@
 // ==========================================
 let currentData = {};
 let selectedMonth = "";
+let hasUnsavedChanges = false;
 
 function getGithubConfig() {
     return {
@@ -12,40 +13,13 @@ function getGithubConfig() {
     };
 }
 
-function showToast(message, isError = false) {
-    let toast = document.getElementById('toast-notification');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'toast-notification';
-        toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            border-radius: 30px;
-            font-weight: bold;
-            font-size: 15px;
-            z-index: 9999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            transition: opacity 0.3s ease;
-            text-align: center;
-        `;
-        document.body.appendChild(toast);
+function showStatusMessage(text, isError = false) {
+    const statusEl = document.getElementById('status-message');
+    if (statusEl) {
+        statusEl.textContent = text;
+        statusEl.style.color = isError ? '#d9534f' : '#5cb85c';
+        setTimeout(() => { statusEl.textContent = ''; }, 4000);
     }
-
-    toast.textContent = message;
-    toast.style.backgroundColor = isError ? '#d9534f' : '#28a745';
-    toast.style.color = '#ffffff';
-    toast.style.opacity = '1';
-
-    setTimeout(() => {
-        toast.style.opacity = '0';
-    }, 2500);
-}
-
-function encodeUnicodeToBase64(str) {
-    return btoa(unescape(encodeURIComponent(str)));
 }
 
 // ==========================================
@@ -128,39 +102,34 @@ function updateIchilovPreview() {
 // ==========================================
 async function loadData() {
     try {
-        // קריאה נקייה ובסיסית לקובץ המקומי
-        const response = await fetch('data.json');
-        
-        if (!response.ok) {
-            throw new Error(`שגיאת HTTP ${response.status}`);
-        }
-
+        const response = await fetch('data.json?t=' + Date.now());
+        if (!response.ok) throw new Error("שגיאה בטעינת data.json");
         currentData = await response.json();
-
+        
         const monthPicker = document.getElementById('month-select');
         if (monthPicker) {
-            const availableMonths = Object.keys(currentData);
-            if (availableMonths.length > 0) {
-                if (!selectedMonth || !currentData[selectedMonth]) {
+            if (!selectedMonth) {
+                const availableMonths = Object.keys(currentData);
+                if (availableMonths.length > 0) {
                     selectedMonth = availableMonths[0];
+                } else {
+                    const now = new Date();
+                    selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
                 }
-            } else {
-                const now = new Date();
-                selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             }
             monthPicker.value = selectedMonth;
         }
-
+        
         renderDashboard();
     } catch (err) {
         console.error("שגיאה בטעינת הנתונים:", err);
-        showToast("שגיאה בטעינת data.json", true);
+        showStatusMessage("שגיאה בטעינת קובץ הנתונים", true);
     }
 }
 
 function renderDashboard() {
     const events = currentData[selectedMonth] || [];
-
+    
     let totalAll = 0;
     let totalPaid = 0;
     let totalUnpaid = 0;
@@ -189,6 +158,7 @@ function renderDashboard() {
                 </select>
             `;
 
+            // 1. רינדור טבלה כללית
             if (mainList) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -205,6 +175,7 @@ function renderDashboard() {
                 mainList.appendChild(tr);
             }
 
+            // 2. רינדור טבלת איכילוב
             if (item.isIchilov && ichilovList) {
                 const iData = item.ichilovData || {};
                 
@@ -244,6 +215,7 @@ function renderDashboard() {
         }
     });
 
+    // עדכון כרטיסי הסיכום
     const elTotal = document.getElementById('total-amount');
     const elPaid = document.getElementById('paid-amount');
     const elUnpaid = document.getElementById('unpaid-amount');
@@ -251,66 +223,38 @@ function renderDashboard() {
     if (elTotal) elTotal.textContent = `₪${totalAll.toLocaleString()}`;
     if (elPaid) elPaid.textContent = `₪${totalPaid.toLocaleString()}`;
     if (elUnpaid) elUnpaid.textContent = `₪${totalUnpaid.toLocaleString()}`;
+
+    // הצגת/הסתרת כפתור שמירה במידה ויש שינויים
+    renderSaveButton();
 }
 
-// ==========================================
-// 5. שמירת שינויים ב-GitHub
-// ==========================================
-async function saveToGithub() {
-    const config = getGithubConfig();
-
-    if (!config.username || !config.repo || !config.token) {
-        showToast('הגדרות GitHub חסרות - השינוי נשמר מקומית בלבד', true);
-        return;
-    }
-
-    showToast('⏳ שומר שינויים ב-GitHub...');
-
-    try {
-        const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
+function renderSaveButton() {
+    let saveBtnContainer = document.getElementById('save-changes-container');
+    if (!saveBtnContainer) {
+        saveBtnContainer = document.createElement('div');
+        saveBtnContainer.id = 'save-changes-container';
+        saveBtnContainer.style.cssText = 'text-align: center; margin: 20px 0;';
         
-        const getRes = await fetch(url, {
-            headers: { 
-                'Authorization': `token ${config.token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
-        });
+        const mainCard = document.querySelector('.card') || document.body;
+        mainCard.appendChild(saveBtnContainer);
+    }
 
-        if (!getRes.ok) throw new Error(`שגיאה בשליפת הקובץ מ-GitHub (${getRes.status})`);
-
-        const getData = await getRes.json();
-        const sha = getData.sha;
-
-        const jsonString = JSON.stringify(currentData, null, 2);
-        const contentEncoded = encodeUnicodeToBase64(jsonString);
-
-        const putRes = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${config.token}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/vnd.github.v3+json'
-            },
-            body: JSON.stringify({
-                message: 'עדכון נתונים מתוך האפליקציה',
-                content: contentEncoded,
-                sha: sha
-            })
-        });
-
-        if (putRes.ok) {
-            showToast('✓ השינויים נשמרו בהצלחה ב-GitHub!');
-        } else {
-            const errData = await putRes.json();
-            throw new Error(errData.message || 'שגיאה בשמירה');
-        }
-    } catch (err) {
-        console.error("GitHub Save Error:", err);
-        showToast(`❌ שגיאה בשמירה: ${err.message}`, true);
+    if (hasUnsavedChanges) {
+        saveBtnContainer.innerHTML = `
+            <button onclick="window.saveAllChanges()" 
+                    style="background-color: #28a745; color: white; padding: 12px 28px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                💾 שמור שינויים
+            </button>
+        `;
+    } else {
+        saveBtnContainer.innerHTML = '';
     }
 }
 
-window.handleStatusChange = async function(id, value) {
+// ==========================================
+// 5. שינוי סטטוס תשלום + שמירה ל-GitHub/Local
+// ==========================================
+window.handleStatusChange = function(id, value) {
     const monthEvents = currentData[selectedMonth] || [];
     const targetEvent = monthEvents.find(item => item.id === id);
 
@@ -328,16 +272,72 @@ window.handleStatusChange = async function(id, value) {
         targetEvent.isPaid = newStatus;
     }
 
+    hasUnsavedChanges = true;
     renderDashboard();
-    await saveToGithub();
+    showStatusMessage('ישנם שינויים שלא נשמרו. לחץ על "שמור שינויים"');
 };
 
-window.deleteEvent = async function(id) {
+window.saveAllChanges = async function() {
+    const config = getGithubConfig();
+
+    if (config.username && config.repo && config.token) {
+        showStatusMessage('שומר שינויים ב-GitHub...');
+        try {
+            const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
+            
+            // 1. קבלת ה-SHA הנוכחי של הקובץ
+            const getRes = await fetch(url, {
+                headers: { 'Authorization': `token ${config.token}` }
+            });
+            const getData = await getRes.json();
+            const sha = getData.sha;
+
+            // 2. עדכון הקובץ ב-GitHub
+            const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(currentData, null, 2))));
+            
+            const putRes = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${config.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: 'עדכון סטטוס תשלומים מהאפליקציה',
+                    content: contentEncoded,
+                    sha: sha
+                })
+            });
+
+            if (putRes.ok) {
+                hasUnsavedChanges = false;
+                renderDashboard();
+                showStatusMessage('השינויים נשמרו בהצלחה ב-GitHub!');
+            } else {
+                throw new Error('שגיאה בשמירה ל-GitHub');
+            }
+        } catch (err) {
+            console.error(err);
+            showStatusMessage('שגיאה בתקשורת מול GitHub. המידע נשמר מקומית בדפדפן.', true);
+            localStorage.setItem('local_data_backup', JSON.stringify(currentData));
+            hasUnsavedChanges = false;
+            renderDashboard();
+        }
+    } else {
+        // אם לא מוגדר GitHub - שומר ב-LocalStorage
+        localStorage.setItem('local_data_backup', JSON.stringify(currentData));
+        hasUnsavedChanges = false;
+        renderDashboard();
+        showStatusMessage('השינויים נשמרו מקומית בדפדפן (לא מוגדר GitHub Token)');
+    }
+};
+
+window.deleteEvent = function(id) {
     if (!confirm("האם אתה בטוח שברצונך למחוק אירוע זה?")) return;
     if (currentData[selectedMonth]) {
         currentData[selectedMonth] = currentData[selectedMonth].filter(item => item.id !== id);
+        hasUnsavedChanges = true;
         renderDashboard();
-        await saveToGithub();
+        showStatusMessage('האירוע נמחק. זכור ללחוץ על "שמור שינויים"');
     }
 };
 
@@ -383,7 +383,7 @@ function setupModal() {
             localStorage.setItem('gh_repo', repo);
             localStorage.setItem('gh_token', token);
 
-            showToast('ההגדרות נשמרו בהצלחה!');
+            showStatusMessage('ההגדרות נשמרו בהצלחה!');
             modal.style.display = 'none';
         };
     }
@@ -413,7 +413,7 @@ function setupTabs() {
 function setupForms() {
     const regularForm = document.getElementById('add-regular-form');
     if (regularForm) {
-        regularForm.onsubmit = async (e) => {
+        regularForm.onsubmit = (e) => {
             e.preventDefault();
             const client = document.getElementById('client-name').value;
             const type = document.getElementById('job-type').value;
@@ -438,9 +438,10 @@ function setupForms() {
             if (!currentData[monthKey]) currentData[monthKey] = [];
             currentData[monthKey].push(newEvent);
 
+            hasUnsavedChanges = true;
             renderDashboard();
             regularForm.reset();
-            await saveToGithub();
+            showStatusMessage('אירוע נוצר! לחץ "שמור שינויים" לעדכון הקובץ.');
         };
     }
 
@@ -454,7 +455,7 @@ function setupForms() {
             }
         });
 
-        ichilovForm.onsubmit = async (e) => {
+        ichilovForm.onsubmit = (e) => {
             e.preventDefault();
             const date = document.getElementById('ichilov-date').value;
             const location = document.getElementById('ichilov-location').value;
@@ -489,10 +490,11 @@ function setupForms() {
             if (!currentData[monthKey]) currentData[monthKey] = [];
             currentData[monthKey].push(newEvent);
 
+            hasUnsavedChanges = true;
             renderDashboard();
             ichilovForm.reset();
             updateIchilovPreview();
-            await saveToGithub();
+            showStatusMessage('מופע איכילוב נוסף! לחץ "שמור שינויים" לעדכון הקובץ.');
         };
     }
 }
@@ -515,4 +517,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadData();
 });
-#end app.py
