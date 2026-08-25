@@ -292,9 +292,13 @@ window.saveAllChanges = async function() {
             const getData = await getRes.json();
             const sha = getData.sha;
 
-            // 2. עדכון הקובץ ב-GitHub
-            const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(currentData, null, 2))));
+            // 2. המרה בטוחה ל-Base64 התומכת בעברית (UTF-8)
+            const jsonString = JSON.stringify(currentData, null, 2);
+            const utf8Bytes = new TextEncoder().encode(jsonString);
+            const binaryString = String.fromCharCode(...utf8Bytes);
+            const contentEncoded = btoa(binaryString);
             
+            // 3. עדכון הקובץ ב-GitHub
             const putRes = await fetch(url, {
                 method: 'PUT',
                 headers: {
@@ -302,7 +306,7 @@ window.saveAllChanges = async function() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    message: 'עדכון סטטוס תשלומים מהאפליקציה',
+                    message: 'עדכון נתונים מהאפליקציה',
                     content: contentEncoded,
                     sha: sha
                 })
