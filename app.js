@@ -7,9 +7,9 @@ let hasUnsavedChanges = false;
 
 function getGithubConfig() {
     return {
-        username: (localStorage.getItem('gh_username') || '').trim(),
-        repo: (localStorage.getItem('gh_repo') || '').trim(),
-        token: (localStorage.getItem('gh_token') || '').trim()
+        username: (localStorage.getItem('gh_username') || localStorage.getItem('username') || localStorage.getItem('gh-username') || '').trim(),
+        repo: (localStorage.getItem('gh_repo') || localStorage.getItem('repo') || '').trim(),
+        token: (localStorage.getItem('gh_token') || localStorage.getItem('token') || '').trim()
     };
 }
 
@@ -127,6 +127,42 @@ async function loadData() {
     }
 }
 
+function updateClientsDropdown() {
+    const selectEl = document.getElementById('client-select');
+    if (!selectEl) return;
+
+    const previousValue = selectEl.value;
+
+    const clientsSet = new Set();
+    Object.values(currentData).forEach(monthEvents => {
+        if (Array.isArray(monthEvents)) {
+            monthEvents.forEach(item => {
+                if (item.client && item.client.trim()) {
+                    clientsSet.add(item.client.trim());
+                }
+            });
+        }
+    });
+
+    selectEl.innerHTML = '<option value="" disabled selected>בחר לקוח...</option>';
+
+    Array.from(clientsSet).sort().forEach(clientName => {
+        const option = document.createElement('option');
+        option.value = clientName;
+        option.textContent = clientName;
+        selectEl.appendChild(option);
+    });
+
+    const newOpt = document.createElement('option');
+    newOpt.value = "__NEW__";
+    newOpt.textContent = "➕ לקוח חדש...";
+    selectEl.appendChild(newOpt);
+
+    if (previousValue && Array.from(selectEl.options).some(o => o.value === previousValue)) {
+        selectEl.value = previousValue;
+    }
+}
+
 function renderDashboard() {
     const events = currentData[selectedMonth] || [];
     
@@ -158,7 +194,6 @@ function renderDashboard() {
                 </select>
             `;
 
-            // 1. רינדור טבלה כללית
             if (mainList) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -175,14 +210,12 @@ function renderDashboard() {
                 mainList.appendChild(tr);
             }
 
-            // 2. רינדור טבלת איכילוב
             if (item.isIchilov && ichilovList) {
                 const iData = item.ichilovData || {};
                 
                 const tThere = iData.timeThere || 0;
                 const tBack = iData.timeBack || 0;
                 const totalMins = parseTimeToMinutes(tThere) + parseTimeToMinutes(tBack);
-                const hoursFormatted = formatMinutesToHHMM(totalMins);
 
                 const calc = iData.calcDetails || calculateIchilov(
                     iData.showType || item.type,
@@ -197,7 +230,7 @@ function renderDashboard() {
                     <td>${iData.location || item.location || ''}</td>
                     <td>${iData.showType || item.type || ''}</td>
                     <td>${(Number(iData.kmOneWay) || 0) * 2} ק"מ</td>
-                    <td>${calc.totalHoursStr || hoursFormatted}</td>
+                    <td>${calc.totalHoursStr || formatMinutesToHHMM(totalMins)}</td>
                     <td>₪${calc.basePay || 0}</td>
                     <td>₪${calc.kmPay || 0}</td>
                     <td>₪${calc.timePay || 0}</td>
@@ -215,7 +248,6 @@ function renderDashboard() {
         }
     });
 
-    // עדכון כרטיסי הסיכום
     const elTotal = document.getElementById('total-amount');
     const elPaid = document.getElementById('paid-amount');
     const elUnpaid = document.getElementById('unpaid-amount');
@@ -224,6 +256,7 @@ function renderDashboard() {
     if (elPaid) elPaid.textContent = `₪${totalPaid.toLocaleString()}`;
     if (elUnpaid) elUnpaid.textContent = `₪${totalUnpaid.toLocaleString()}`;
 
+    updateClientsDropdown();
     renderSaveButton();
 }
 
@@ -354,7 +387,7 @@ window.deleteEvent = function(id) {
 };
 
 // ==========================================
-// 6. ניהול חלון הגדרות GitHub (Modal) - מוגן ומאתר שדות אוטומטית
+// 6. ניהול חלון הגדרות GitHub (Modal)
 // ==========================================
 function setupModal() {
     const modal = document.getElementById('settings-modal');
@@ -362,7 +395,6 @@ function setupModal() {
     const closeBtn = document.querySelector('.close-btn');
     const form = document.getElementById('settings-form');
 
-    // פונקציית עזר למציאת אלמנט קלט לפי מספר מזהים אפשריים
     const getInputElement = (...ids) => {
         for (let id of ids) {
             const el = document.getElementById(id);
@@ -439,11 +471,36 @@ function setupTabs() {
 // 8. הוספת אירועים
 // ==========================================
 function setupForms() {
+    const clientSelect = document.getElementById('client-select');
+    const newClientContainer = document.getElementById('new-client-container');
+
+    if (clientSelect && newClientContainer) {
+        clientSelect.addEventListener('change', (e) => {
+            if (e.target.value === '__NEW__') {
+                newClientContainer.style.display = 'block';
+                document.getElementById('new-client-name').required = true;
+            } else {
+                newClientContainer.style.display = 'none';
+                document.getElementById('new-client-name').required = false;
+            }
+        });
+    }
+
     const regularForm = document.getElementById('add-regular-form');
     if (regularForm) {
         regularForm.onsubmit = (e) => {
             e.preventDefault();
-            const client = document.getElementById('client-name').value;
+            
+            let client = clientSelect ? clientSelect.value : '';
+            if (client === '__NEW__') {
+                client = document.getElementById('new-client-name').value.trim();
+            }
+
+            if (!client) {
+                alert('אנא בחר או הכנס שם לקוח');
+                return;
+            }
+
             const type = document.getElementById('job-type').value;
             const location = document.getElementById('job-location').value;
             const date = document.getElementById('job-date').value;
@@ -467,8 +524,9 @@ function setupForms() {
             currentData[monthKey].push(newEvent);
 
             hasUnsavedChanges = true;
-            renderDashboard();
             regularForm.reset();
+            if (newClientContainer) newClientContainer.style.display = 'none';
+            renderDashboard();
             showStatusMessage('אירוע נוצר! לחץ "שמור שינויים" לעדכון הקובץ.');
         };
     }
