@@ -3,225 +3,352 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מערכת מעקב תשלומים ומופעים</title>
-    <link rel="stylesheet" href="style.css">
+    <title>ניהול שכר ודיווח שעות</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            direction: rtl;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            background: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        h1, h2, h3 {
+            margin: 0;
+            color: var(--text);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 2px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+            background: var(--card-bg);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        input, select {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: right;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .summary-box {
+            background: #e0f2fe;
+            border-right: 4px solid var(--primary);
+            padding: 16px;
+            border-radius: 6px;
+            margin-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .badge-link {
+            display: inline-block;
+            background-color: #3b82f6;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .badge-link:hover {
+            background-color: #1d4ed8;
+        }
+
+        .summary-footer-row {
+            background-color: #f8fafc;
+            font-weight: bold;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <!-- כותרת ראשית וכפתור הגדרות -->
-        <header>
-            <div class="header-content">
-                <h1>📊 מעקב תשלומים ואירועים</h1>
-                <button id="settings-btn" class="settings-btn">⚙️ הגדרות GitHub</button>
-            </div>
-            <div id="status-message" class="status-message"></div>
-        </header>
 
-        <!-- בחירת חודש -->
-        <section class="month-selector-card">
-            <label for="month-select"><strong>בחר חודש לצפייה וניהול:</strong></label>
+<div class="container">
+    <header>
+        <h1>מערכת ניהול שכר</h1>
+        <div id="month-selector-container">
+            <label for="month-select">חודש תצוגה:</label>
             <input type="month" id="month-select">
-        </section>
+        </div>
+    </header>
 
-        <!-- סיכום כספי חודשי -->
-        <section class="summary-cards">
-            <div class="card summary-card total">
-                <h3>סה"כ כולל</h3>
-                <p id="total-amount">₪0</p>
-            </div>
-            <div class="card summary-card paid">
-                <h3>שולם</h3>
-                <p id="paid-amount">₪0</p>
-            </div>
-            <div class="card summary-card unpaid">
-                <h3>לגבייה (טרם שולם)</h3>
-                <p id="unpaid-amount">₪0</p>
-            </div>
-        </section>
-
-        <!-- טפסים להוספת אירוע/לקוח -->
-        <section class="forms-container">
-            <!-- לשוניות מעבר בין טפסים -->
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="regular-form">הוספת לקוח / עבודה רגילה</button>
-                <button class="tab-btn" data-tab="ichilov-form">מחשבון מופע איכילוב</button>
-            </div>
-
-            <!-- טופס 1: עבודה רגילה -->
-            <div id="regular-form" class="tab-content active">
-                <h2>הוספת אירוע / לקוח רגיל</h2>
-                <form id="add-regular-form">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="client-select">שם הלקוח</label>
-                            <select id="client-select" class="form-control" required>
-                                <!-- יתמלא אוטומטית מקובץ ה-JS -->
-                            </select>
-                            <div id="new-client-container" style="display: none; margin-top: 8px;">
-                                <input type="text" id="new-client-name" class="form-control" placeholder="הכנס שם לקוח חדש...">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="job-type">סוג העבודה</label>
-                            <input type="text" id="job-type" placeholder="למשל: שיעור / הופעה / הקלטה" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="job-location">מיקום / כתובת</label>
-                            <input type="text" id="job-location" placeholder="למשל: תל אביב / אולם...">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="job-date">תאריך</label>
-                            <input type="date" id="job-date" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="job-amount">סכום לתשלום (₪)</label>
-                            <input type="number" id="job-amount" min="0" step="any" placeholder="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="job-status">סטטוס תשלום</label>
-                            <select id="job-status">
-                                <option value="false">✗ טרם שולם</option>
-                                <option value="true">✓ שולם</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" class="submit-btn">➕ הוסף לטבלה הכללית</button>
-                </form>
-            </div>
-
-            <!-- טופס 2: מחשבון איכילוב -->
-            <div id="ichilov-form" class="tab-content">
-                <h2>מחשבון מופע - איכילוב</h2>
-                <form id="add-ichilov-form">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="ichilov-date">תאריך המופע</label>
-                            <input type="date" id="ichilov-date" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="ichilov-location">מיקום המופע</label>
-                            <input type="text" id="ichilov-location" placeholder="שם בית החולים / מחלקה" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="ichilov-show-type">סוג מופע</label>
-                            <select id="ichilov-show-type">
-                                <option value="רגיל">מופע רגיל (₪350)</option>
-                                <option value="זוגי">מופע זוגי (₪250)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="ichilov-km">קילומטראז' (כיוון אחד ב-km)</label>
-                            <input type="number" id="ichilov-km" min="0" step="0.1" placeholder="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="ichilov-time-there">זמן נסיעה הלוך (דקות)</label>
-                            <input type="number" id="ichilov-time-there" min="0" placeholder="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="ichilov-time-back">זמן נסיעה חזור (דקות)</label>
-                            <input type="number" id="ichilov-time-back" min="0" placeholder="0" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="ichilov-status">סטטוס תשלום</label>
-                            <select id="ichilov-status">
-                                <option value="false">✗ טרם שולם</option>
-                                <option value="true">✓ שולם</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- תצוגה מקדימה של החישוב -->
-                    <div id="ichilov-calc-preview" class="calc-preview">
-                        <strong>חישוב משוער:</strong>
-                        <span id="calc-breakdown">הזן נתונים לצפייה בחישוב</span>
-                    </div>
-
-                    <button type="submit" class="submit-btn ichilov-btn">➕ הוסף מופע איכילוב</button>
-                </form>
-            </div>
-        </section>
-
-        <!-- טבלה 1: טבלה כללית (כל האירועים) -->
-        <section class="table-section">
-            <h2>📋 ריכוז תשלומים כללי</h2>
-            <div class="table-responsive">
-                <table id="payments-table">
-                    <thead>
-                        <tr>
-                            <th>תאריך</th>
-                            <th>שם הלקוח</th>
-                            <th>סוג עבודה</th>
-                            <th>מיקום</th>
-                            <th>סכום</th>
-                            <th>סטטוס תשלום</th>
-                            <th>פעולות</th>
-                        </tr>
-                    </thead>
-                    <tbody id="payments-list">
-                        <!-- נתונים יתווספו כאן דינמית -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- טבלה 2: פירוט מופעי איכילוב בלבד -->
-        <section class="table-section ichilov-section">
-            <h2>🏥 פירוט מופעי איכילוב</h2>
-            <div class="table-responsive">
-                <table id="ichilov-table">
-                    <thead>
-                        <tr>
-                            <th>תאריך</th>
-                            <th>מיקום</th>
-                            <th>סוג מופע</th>
-                            <th>ק"מ (הלוך+חזור)</th>
-                            <th>זמן נסיעה כולל</th>
-                            <th>שכר בסיס</th>
-                            <th>נסיעות</th>
-                            <th>תוספת זמן</th>
-                            <th>סה"כ למופע</th>
-                            <th>סטטוס</th>
-                            <th>פעולות</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ichilov-list">
-                        <!-- נתוני איכילוב יתווספו כאן דינמית -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('regular')">הוספת לקוח / עבודה רגילה</button>
+        <button class="tab-btn" onclick="switchTab('ichilov')">מחשבון איכילוב</button>
+        <button class="tab-btn" onclick="switchTab('summary')">ריכוז חודשי</button>
     </div>
 
-    <!-- חלונית מודאל להגדרות GitHub -->
-    <div id="settings-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>⚙️ הגדרות חיבור ל-GitHub</h2>
-            <p>הזן את הפרטים כדי לאפשר שמירת נתונים אוטומטית ב-Repository שלך:</p>
-            <form id="settings-form">
-                <div class="form-group">
-                    <label for="github-username">שם משתמש ב-GitHub:</label>
-                    <input type="text" id="github-username" placeholder="למשל: yuval-laufer" required>
+    <!-- טאב 1: עבודה רגילה -->
+    <div id="tab-regular" class="tab-content active">
+        <div class="card">
+            <h2>דיווח שעות / עבודה</h2>
+            <form id="regular-form" onsubmit="addRegularWork(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>תאריך</label>
+                        <input type="date" id="reg-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>שם הלקוח</label>
+                        <select id="client-select" onchange="handleClientSelectChange(this)">
+                            <!-- יאוכלס דינמית מ-data.json -->
+                        </select>
+                        <input type="text" id="reg-client-new" placeholder="הכנס שם לקוח חדש" style="display: none; margin-top: 5px;">
+                    </div>
+                    <div class="form-group">
+                        <label>תיאור עבודה / מופע</label>
+                        <input type="text" id="reg-desc" placeholder="למשל: אימון, הופעה..." required>
+                    </div>
+                    <div class="form-group">
+                        <label>שעות / כמות</label>
+                        <input type="number" step="0.1" id="reg-hours" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>תעריף לשעה / יחידה (₪)</label>
+                        <input type="number" id="reg-rate" placeholder="0" required>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="github-repo">שם ה-Repository:</label>
-                    <input type="text" id="github-repo" placeholder="למשל: my-payments" required>
-                </div>
-                <div class="form-group">
-                    <label for="github-token">Personal Access Token (PAT):</label>
-                    <input type="password" id="github-token" placeholder="ghp_xxxxxxxxxxxx" required>
-                </div>
-                <button type="submit" class="submit-btn">שמור הגדרות</button>
+                <button type="submit" class="btn btn-primary">הוסף דיווח</button>
             </form>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- טאב 2: מחשבון איכילוב -->
+    <div id="tab-ichilov" class="tab-content">
+        <div class="card">
+            <h2>מחשבון מופעי איכילוב</h2>
+            <form id="ichilov-form" onsubmit="addIchilovShow(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>תאריך</label>
+                        <input type="date" id="ichilov-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>מיקום המופע</label>
+                        <input type="text" id="ichilov-location" placeholder="שם המחלקה/המקום" required>
+                    </div>
+                    <div class="form-group">
+                        <label>סוג מופע</label>
+                        <select id="ichilov-show-type">
+                            <option value="רגיל">מופע רגיל (₪670)</option>
+                            <option value="ארוך">מופע ארוך (₪840)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>קילומטרים (לכיוון אחד)</label>
+                        <input type="number" id="ichilov-km" step="0.1" placeholder="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>זמן נסיעה הלוך (שעות:דקות)</label>
+                        <input type="time" id="ichilov-time-there" required>
+                    </div>
+                    <div class="form-group">
+                        <label>זמן נסיעה חזור (שעות:דקות)</label>
+                        <input type="time" id="ichilov-time-back" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">חשב והוסף מופע</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3 id="ichilov-table-title">פירוט מופעי איכילוב</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>תאריך</th>
+                        <th>מיקום</th>
+                        <th>זמן נסיעה כולל</th>
+                        <th>זמן מעבר ל-2 שעות</th>
+                        <th>תשלום מופע</th>
+                        <th>החזר ק"מ</th>
+                        <th>החזר זמן</th>
+                        <th>סה"כ</th>
+                        <th>פעולות</th>
+                    </tr>
+                </thead>
+                <tbody id="ichilov-table-body">
+                    <!-- יאוכלס דינמית -->
+                </tbody>
+                <tfoot>
+                    <tr class="summary-footer-row">
+                        <td colspan="7" id="ichilov-month-summary-label" style="text-align: left;">סה"כ לתשלום – חודש:</td>
+                        <td id="ichilov-month-summary-total">₪0</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- טאב 3: ריכוז חודשי -->
+    <div id="tab-summary" class="tab-content">
+        <div class="card">
+            <h2>ריכוז חודשי כולל</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>תאריך</th>
+                        <th>לקוח</th>
+                        <th>תיאור / פירוט</th>
+                        <th>סה"כ לתשלום</th>
+                        <th>קישור / פעולות</th>
+                    </tr>
+                </thead>
+                <tbody id="summary-table-body">
+                    <!-- יאוכלס דינמית -->
+                </tbody>
+            </table>
+            <div class="summary-box">
+                <span>סה"כ הכנסות מתוקצב לחודש זה:</span>
+                <span id="grand-total-amount" style="font-size: 20px; color: var(--primary);">₪0</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
