@@ -7,9 +7,9 @@ let hasUnsavedChanges = false;
 
 function getGithubConfig() {
     return {
-        username: localStorage.getItem('gh_username') || '',
-        repo: localStorage.getItem('gh_repo') || '',
-        token: localStorage.getItem('gh_token') || ''
+        username: (localStorage.getItem('gh_username') || '').trim(),
+        repo: (localStorage.getItem('gh_repo') || '').trim(),
+        token: (localStorage.getItem('gh_token') || '').trim()
     };
 }
 
@@ -18,7 +18,7 @@ function showStatusMessage(text, isError = false) {
     if (statusEl) {
         statusEl.textContent = text;
         statusEl.style.color = isError ? '#d9534f' : '#5cb85c';
-        setTimeout(() => { statusEl.textContent = ''; }, 4000);
+        setTimeout(() => { statusEl.textContent = ''; }, 5000);
     }
 }
 
@@ -224,7 +224,6 @@ function renderDashboard() {
     if (elPaid) elPaid.textContent = `₪${totalPaid.toLocaleString()}`;
     if (elUnpaid) elUnpaid.textContent = `₪${totalUnpaid.toLocaleString()}`;
 
-    // הצגת/הסתרת כפתור שמירה במידה ויש שינויים
     renderSaveButton();
 }
 
@@ -252,7 +251,7 @@ function renderSaveButton() {
 }
 
 // ==========================================
-// 5. שינוי סטטוס תשלום + שמירה ל-GitHub/Local (מתוקן בלבד!)
+// 5. שינוי סטטוס תשלום + שמירה ל-GitHub
 // ==========================================
 window.handleStatusChange = function(id, value) {
     const monthEvents = currentData[selectedMonth] || [];
@@ -280,70 +279,70 @@ window.handleStatusChange = function(id, value) {
 window.saveAllChanges = async function() {
     const config = getGithubConfig();
 
-    if (config.username && config.repo && config.token) {
-        showStatusMessage('שומר שינויים ב-GitHub...');
-        try {
-            const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
-            const authHeader = { 
-                'Authorization': `token ${config.token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            };
-            
-            // 1. קבלת ה-SHA הנוכחי של הקובץ תוך שליחת ה-Authorization Header
-            let sha = null;
-            const getRes = await fetch(url, { headers: authHeader });
-            
-            if (getRes.ok) {
-                const getData = await getRes.json();
-                sha = getData.sha;
-            } else if (getRes.status !== 404) {
-                const errData = await getRes.json().catch(() => ({}));
-                throw new Error(errData.message || `שגיאת תקשורת (${getRes.status})`);
-            }
-
-            // 2. המרה בטוחה ל-Base64 התומכת בעברית (UTF-8)
-            const jsonString = JSON.stringify(currentData, null, 2);
-            const utf8Bytes = new TextEncoder().encode(jsonString);
-            const binaryString = String.fromCharCode(...utf8Bytes);
-            const contentEncoded = btoa(binaryString);
-            
-            // 3. עדכון הקובץ ב-GitHub
-            const payload = {
-                message: 'עדכון נתונים מהאפליקציה',
-                content: contentEncoded
-            };
-            if (sha) payload.sha = sha;
-
-            const putRes = await fetch(url, {
-                method: 'PUT',
-                headers: {
-                    ...authHeader,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (putRes.ok) {
-                hasUnsavedChanges = false;
-                renderDashboard();
-                showStatusMessage('השינויים נשמרו בהצלחה ב-GitHub!');
-            } else {
-                const putErr = await putRes.json().catch(() => ({}));
-                throw new Error(putErr.message || 'שגיאה בשמירה ל-GitHub');
-            }
-        } catch (err) {
-            console.error(err);
-            showStatusMessage(`שגיאה בשמירה ל-GitHub (${err.message}). נשמר מקומית בדפדפן.`, true);
-            localStorage.setItem('local_data_backup', JSON.stringify(currentData));
-            hasUnsavedChanges = false;
-            renderDashboard();
-        }
-    } else {
-        // אם לא מוגדר GitHub - שומר ב-LocalStorage
+    if (!config.username || !config.repo || !config.token) {
         localStorage.setItem('local_data_backup', JSON.stringify(currentData));
         hasUnsavedChanges = false;
         renderDashboard();
-        showStatusMessage('השינויים נשמרו מקומית בדפדפן (לא מוגדר GitHub Token)');
+        showStatusMessage('השינויים נשמרו מקומית בדפדפן (חסרים פרטי חיבור בהגדרות GitHub)', true);
+        return;
+    }
+
+    showStatusMessage('שומר שינויים ב-GitHub...');
+    try {
+        const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
+        const headers = { 
+            'Authorization': `Bearer ${config.token}`,
+            'Accept': 'application/vnd.github.v3+json'
+        };
+        
+        // 1. קבלת ה-SHA הנוכחי
+        let sha = null;
+        const getRes = await fetch(url, { headers });
+        
+        if (getRes.ok) {
+            const getData = await getRes.json();
+            sha = getData.sha;
+        } else if (getRes.status !== 404) {
+            const errData = await getRes.json().catch(() => ({}));
+            throw new Error(errData.message || `שגיאת גישה (${getRes.status})`);
+        }
+
+        // 2. קידוד בטוח ל-UTF8/Base64
+        const jsonString = JSON.stringify(currentData, null, 2);
+        const utf8Bytes = new TextEncoder().encode(jsonString);
+        let binaryString = "";
+        for (let i = 0; i < utf8Bytes.length; i++) {
+            binaryString += String.fromCharCode(utf8Bytes[i]);
+        }
+        const contentEncoded = btoa(binaryString);
+        
+        // 3. עדכון ב-GitHub
+        const payload = {
+            message: 'עדכון נתונים מאפליקציית התשלומים',
+            content: contentEncoded
+        };
+        if (sha) payload.sha = sha;
+
+        const putRes = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (putRes.ok) {
+            hasUnsavedChanges = false;
+            renderDashboard();
+            showStatusMessage('השינויים נשמרו בהצלחה ב-GitHub!');
+        } else {
+            const putErr = await putRes.json().catch(() => ({}));
+            throw new Error(putErr.message || 'שגיאה בשמירה ל-GitHub');
+        }
+    } catch (err) {
+        console.error(err);
+        showStatusMessage(`שגיאה בשמירה ל-GitHub: ${err.message}`, true);
     }
 };
 
@@ -399,7 +398,7 @@ function setupModal() {
             localStorage.setItem('gh_repo', repo);
             localStorage.setItem('gh_token', token);
 
-            showStatusMessage('ההגדרות נשמרו בהצלחה!');
+            showStatusMessage('הגדרות GitHub נשמרו בהצלחה!');
             modal.style.display = 'none';
         };
     }
