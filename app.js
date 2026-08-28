@@ -1,6 +1,9 @@
 // ==========================================
-// 1. משתנים גלובליים וניהול הגדרות GitHub
+// 1. הגדרות ומשתנים גלובליים
 // ==========================================
+// במידה והקובץ data.json יושב בתוך תיקייה, עדכן את הנתיב כאן (למשל: 'data/data.json')
+const DATA_FILE_PATH = 'data.json'; 
+
 let currentData = {};
 let selectedMonth = "";
 let hasUnsavedChanges = false;
@@ -44,66 +47,64 @@ async function loadData() {
     showStatusMessage('טוען נתונים...');
 
     if (config.username && config.repo) {
+        // ניסיון 1: טעינה דרך GitHub Raw URL (פשוט, אמין ועובד ללא סיבוכי API)
+        const rawUrl = `https://raw.githubusercontent.com/${config.username}/${config.repo}/main/${DATA_FILE_PATH}?t=${new Date().getTime()}`;
+        
         try {
-            // ניסיון טעינה באמצעות GitHub API
-            const apiUrl = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
+            console.log("Attempting to load raw file from:", rawUrl);
+            const rawRes = await fetch(rawUrl);
+            if (rawRes.ok) {
+                currentData = await rawRes.json();
+                showStatusMessage('הנתונים נטענו בהצלחה!');
+                initDashboard();
+                return;
+            }
+        } catch (rawErr) {
+            console.warn("Raw load failed, trying API...", rawErr);
+        }
+
+        // ניסיון 2: טעינה דרך GitHub REST API
+        try {
+            const apiUrl = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${DATA_FILE_PATH}`;
             const headers = { 'Accept': 'application/vnd.github.v3+json' };
             if (config.token) {
                 headers['Authorization'] = `token ${config.token}`;
             }
 
-            let res = await fetch(apiUrl, { headers });
-
+            const res = await fetch(apiUrl, { headers });
             if (res.ok) {
                 const data = await res.json();
-                // פענוח Base64 שתומך בעברית (UTF-8)
+                // פענוח מותאם לעברית (UTF-8)
                 const binaryString = atob(data.content.replace(/\s/g, ''));
                 const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
                 const decodedContent = new TextDecoder().decode(bytes);
 
                 currentData = JSON.parse(decodedContent);
-                showStatusMessage('הנתונים נטענו בהצלחה מ-GitHub!');
+                showStatusMessage('הנתונים נטענו בהצלחה מ-GitHub API!');
                 initDashboard();
                 return;
-            } else if (res.status === 404) {
-                // ניסיון טעינה חלופי מ-Raw URL (במידה וה-API החזיר 404)
-                const rawUrl = `https://raw.githubusercontent.com/${config.username}/${config.repo}/main/data.json`;
-                const rawRes = await fetch(rawUrl);
-                if (rawRes.ok) {
-                    currentData = await rawRes.json();
-                    showStatusMessage('הנתונים נטענו בהצלחה מ-Raw GitHub!');
-                    initDashboard();
-                    return;
-                }
-                showStatusMessage('הקובץ data.json עדיין לא קיים ב-GitHub. יוצר מבנה חדש...', true);
-            } else {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(`שגיאה בטעינה מ-GitHub (${res.status}): ${errData.message || ''}`);
             }
-        } catch (err) {
-            console.error("GitHub Load Error:", err);
-            showStatusMessage(`לא ניתן לטעון מ-GitHub: ${err.message}. מנסה טעינה מקומית...`, true);
+        } catch (apiErr) {
+            console.error("API load failed:", apiErr);
         }
-    } else {
-        showStatusMessage('הגדרות GitHub חסרות (משתמש/רפוזיטורי). טוען גיבוי מקומי...', true);
     }
 
-    // טעינה מקומית במקרה של כישלון או חוסר בהגדרות
+    // ניסיון 3: גיבוי מקומי במידה וכל הניסיונות נכשלו
+    console.warn("Loading fallback from local storage");
     const localData = localStorage.getItem('local_data_backup');
     if (localData) {
         try {
             currentData = JSON.parse(localData);
-            showStatusMessage('נתונים נטענו מגיבוי מקומי.');
+            showStatusMessage('נתונים נטענו מגיבוי מקומי (GitHub לא זמין).', true);
         } catch (e) {
-            console.error("Local Storage Read Error:", e);
             currentData = {};
-            showStatusMessage('שגיאה בקריאת הגיבוי המקומי.', true);
+            showStatusMessage('שגיאה בקריאת הנתונים. נוצר מבנה חדש.', true);
         }
     } else {
         currentData = {};
-        showStatusMessage('לא נמצאו נתונים קודמים.', true);
+        showStatusMessage('לא נמצאו נתונים קודמים. נוצר מבנה חדש.', true);
     }
-    
+
     initDashboard();
 }
 
@@ -205,13 +206,13 @@ window.togglePaymentStatus = function(index) {
 };
 
 // ==========================================
-// 5. שמירת שינויים (GitHub / Local)
+// 5. שמירת שינויים ב-GitHub
 // ==========================================
 window.saveAllChanges = async function() {
     const config = getGithubConfig();
 
     if (!config.username || !config.repo || !config.token) {
-        showStatusMessage('הגדרות GitHub חסרות (משתמש, רפוזיטורי או טוקן). נשמר מקומית בלבד.', true);
+        showStatusMessage('חסרים פרטי חיבור ל-GitHub (משתמש, רפוזיטורי או טוקן). נשמר מקומית.', true);
         localStorage.setItem('local_data_backup', JSON.stringify(currentData));
         hasUnsavedChanges = false;
         renderDashboard();
@@ -220,9 +221,8 @@ window.saveAllChanges = async function() {
 
     showStatusMessage('שומר שינויים ב-GitHub...');
     try {
-        const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
+        const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${DATA_FILE_PATH}`;
         
-        // 1. ניסיון לקבלת ה-SHA הנוכחי של הקובץ (במידה והוא כבר קיים)
         let sha = null;
         const getRes = await fetch(url, {
             headers: { 
@@ -234,25 +234,18 @@ window.saveAllChanges = async function() {
         if (getRes.ok) {
             const getData = await getRes.json();
             sha = getData.sha;
-        } else if (getRes.status !== 404) {
-            const errData = await getRes.json().catch(() => ({}));
-            throw new Error(`שגיאה בחיבור ל-GitHub (${getRes.status}): ${errData.message || ''}`);
         }
 
-        // 2. המרה בטוחה ל-Base64 התומכת בעברית (UTF-8)
         const jsonString = JSON.stringify(currentData, null, 2);
         const utf8Bytes = new TextEncoder().encode(jsonString);
         const binaryString = String.fromCharCode(...utf8Bytes);
         const contentEncoded = btoa(binaryString);
         
-        // 3. יצירה / עדכון של הקובץ ב-GitHub
         const payload = {
             message: 'עדכון נתונים מהאפליקציה',
             content: contentEncoded
         };
-        if (sha) {
-            payload.sha = sha; // נדרש רק עבור עדכון קובץ קיים
-        }
+        if (sha) payload.sha = sha;
 
         const putRes = await fetch(url, {
             method: 'PUT',
@@ -271,11 +264,11 @@ window.saveAllChanges = async function() {
             showStatusMessage('השינויים נשמרו בהצלחה ב-GitHub!');
         } else {
             const putErrData = await putRes.json().catch(() => ({}));
-            throw new Error(`שגיאה בשמירה ל-GitHub (${putRes.status}): ${putErrData.message || ''}`);
+            throw new Error(`שגיאה בשמירה (${putRes.status}): ${putErrData.message || ''}`);
         }
     } catch (err) {
-        console.error("GitHub Save Error:", err);
-        showStatusMessage(`שגיאה בשמירה: ${err.message}. המידע נשמר מקומית.`, true);
+        console.error("Save Error:", err);
+        showStatusMessage(`שגיאה בשמירה: ${err.message}. נשמר מקומית בלבד.`, true);
         localStorage.setItem('local_data_backup', JSON.stringify(currentData));
         hasUnsavedChanges = false;
         renderDashboard();
@@ -283,7 +276,7 @@ window.saveAllChanges = async function() {
 };
 
 // ==========================================
-// 6. מאזינים לאירועים ועזרים (Helpers)
+// 6. מאזינים ועזרים
 // ==========================================
 function setupEventListeners() {
     const monthSelect = document.getElementById('monthSelect');
@@ -302,7 +295,7 @@ function setupEventListeners() {
             const token = document.getElementById('ghToken')?.value || '';
 
             saveGithubConfig(username, repo, token);
-            showStatusMessage('הגדרות GitHub עודכנו בהצלחה!');
+            showStatusMessage('הגדרות עודכנו!');
             
             const settingsModalEl = document.getElementById('settingsModal');
             if (settingsModalEl && window.bootstrap) {
