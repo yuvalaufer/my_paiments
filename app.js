@@ -47,21 +47,27 @@ function formatMinutesToHHMM(totalMinutes) {
 }
 
 // ==========================================
-// 3. מחשבון איכילוב (המקורי)
+// 3. מחשבון איכילוב
 // ==========================================
 function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const km = parseFloat(kmOneWay) || 0;
+    const totalKm = km * 2;
+
     const tThereMins = parseTimeToMinutes(timeThere);
     const tBackMins = parseTimeToMinutes(timeBack);
     const totalMins = tThereMins + tBackMins;
 
-    let basePay = (showType === "ארוך") ? 800 : 600;
-    const kmPay = km * 2; 
+    let basePay = 350;
+    if (showType === "זוגי") basePay = 250;
+    else if (showType === "ארוך") basePay = 840;
+
+    const kmPay = totalKm; 
+
+    let excessMins = 0;
     let timePay = 0;
-    
-    if (totalMins > 120) {
-        const excessMins = totalMins - 120;
-        timePay = (excessMins / 60) * 50;
+    if (totalMins > 90) {
+        excessMins = totalMins - 90;
+        timePay = Math.round(excessMins * (840 / 700));
     }
 
     const totalPay = basePay + kmPay + timePay;
@@ -72,7 +78,9 @@ function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
         timePay,
         totalPay,
         totalMins,
-        totalHoursStr: formatMinutesToHHMM(totalMins)
+        excessMins,
+        totalHoursStr: formatMinutesToHHMM(totalMins),
+        excessHoursStr: formatMinutesToHHMM(excessMins)
     };
 }
 
@@ -85,12 +93,12 @@ function updateIchilovPreview() {
     const calc = calculateIchilov(showType, km, timeThere, timeBack);
     const previewEl = document.getElementById('calc-breakdown');
     if (previewEl) {
-        previewEl.innerHTML = `שכר בסיס: ₪${calc.basePay} | נסיעות: ₪${calc.kmPay} | זמן: ₪${calc.timePay} | <strong>סה"כ: ₪${calc.totalPay}</strong>`;
+        previewEl.innerHTML = `שכר בסיס: ₪${calc.basePay} | נסיעות: ₪${calc.kmPay} (${parseFloat(km)*2} ק"מ) | תוספת זמן: ₪${calc.timePay} (${calc.totalHoursStr}) | <strong>סה"כ: ₪${calc.totalPay}</strong>`;
     }
 }
 
 // ==========================================
-// 4. טעינה ורינדור הנתונים (המקורי)
+// 4. טעינה ורינדור הנתונים (Dashboard)
 // ==========================================
 async function loadData() {
     try {
@@ -100,19 +108,16 @@ async function loadData() {
         
         const monthPicker = document.getElementById('month-select');
         if (monthPicker) {
-            monthPicker.innerHTML = '';
-            const availableMonths = Object.keys(currentData);
-            
-            if (availableMonths.length > 0) {
-                availableMonths.forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = m;
-                    opt.textContent = m;
-                    monthPicker.appendChild(opt);
-                });
-                selectedMonth = availableMonths[0];
-                monthPicker.value = selectedMonth;
+            if (!selectedMonth) {
+                const availableMonths = Object.keys(currentData);
+                if (availableMonths.length > 0) {
+                    selectedMonth = availableMonths[0];
+                } else {
+                    const now = new Date();
+                    selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                }
             }
+            monthPicker.value = selectedMonth;
         }
         
         renderDashboard();
@@ -127,12 +132,12 @@ function updateClientsDropdown() {
     if (!selectEl) return;
 
     const previousValue = selectEl.value;
+
     const clientsSet = new Set();
-    
     Object.values(currentData).forEach(monthEvents => {
         if (Array.isArray(monthEvents)) {
             monthEvents.forEach(item => {
-                if (item && item.client && item.client.trim()) {
+                if (item.client && item.client.trim()) {
                     clientsSet.add(item.client.trim());
                 }
             });
@@ -173,7 +178,6 @@ function renderDashboard() {
 
     events.forEach(item => {
         try {
-            if (!item) return;
             const itemAmount = Number(item.amount) || 0;
             totalAll += itemAmount;
             if (item.isPaid) {
@@ -208,6 +212,7 @@ function renderDashboard() {
 
             if (item.isIchilov && ichilovList) {
                 const iData = item.ichilovData || {};
+                
                 const tThere = iData.timeThere || 0;
                 const tBack = iData.timeBack || 0;
                 const totalMins = parseTimeToMinutes(tThere) + parseTimeToMinutes(tBack);
@@ -224,7 +229,7 @@ function renderDashboard() {
                     <td>${item.date || ''}</td>
                     <td>${iData.location || item.location || ''}</td>
                     <td>${iData.showType || item.type || ''}</td>
-                    <td>${Number(iData.kmOneWay) || 0} ק"מ</td>
+                    <td>${(Number(iData.kmOneWay) || 0) * 2} ק"מ</td>
                     <td>${calc.totalHoursStr || formatMinutesToHHMM(totalMins)}</td>
                     <td>₪${calc.basePay || 0}</td>
                     <td>₪${calc.kmPay || 0}</td>
@@ -283,7 +288,7 @@ function renderSaveButton() {
 // ==========================================
 window.handleStatusChange = function(id, value) {
     const monthEvents = currentData[selectedMonth] || [];
-    const targetEvent = monthEvents.find(item => item && item.id === id);
+    const targetEvent = monthEvents.find(item => item.id === id);
 
     if (!targetEvent) return;
 
@@ -291,7 +296,7 @@ window.handleStatusChange = function(id, value) {
 
     if (targetEvent.isIchilov || targetEvent.client === 'החברה מאיכילוב') {
         monthEvents.forEach(item => {
-            if (item && (item.isIchilov || item.client === 'החברה מאיכילוב')) {
+            if (item.isIchilov || item.client === 'החברה מאיכילוב') {
                 item.isPaid = newStatus;
             }
         });
@@ -374,7 +379,7 @@ window.saveAllChanges = async function() {
 window.deleteEvent = function(id) {
     if (!confirm("האם אתה בטוח שברצונך למחוק אירוע זה?")) return;
     if (currentData[selectedMonth]) {
-        currentData[selectedMonth] = currentData[selectedMonth].filter(item => item && item.id !== id);
+        currentData[selectedMonth] = currentData[selectedMonth].filter(item => item.id !== id);
         hasUnsavedChanges = true;
         renderDashboard();
         showStatusMessage('האירוע נמחק. זכור ללחוץ על "שמור שינויים"');
@@ -473,12 +478,10 @@ function setupForms() {
         clientSelect.addEventListener('change', (e) => {
             if (e.target.value === '__NEW__') {
                 newClientContainer.style.display = 'block';
-                const nameInput = document.getElementById('new-client-name');
-                if (nameInput) nameInput.required = true;
+                document.getElementById('new-client-name').required = true;
             } else {
                 newClientContainer.style.display = 'none';
-                const nameInput = document.getElementById('new-client-name');
-                if (nameInput) nameInput.required = false;
+                document.getElementById('new-client-name').required = false;
             }
         });
     }
@@ -490,7 +493,7 @@ function setupForms() {
             
             let client = clientSelect ? clientSelect.value : '';
             if (client === '__NEW__') {
-                client = document.getElementById('new-client-name')?.value.trim() || '';
+                client = document.getElementById('new-client-name').value.trim();
             }
 
             if (!client) {
@@ -498,13 +501,12 @@ function setupForms() {
                 return;
             }
 
-            const type = document.getElementById('job-type')?.value || '';
-            const location = document.getElementById('job-location')?.value || '';
-            const date = document.getElementById('job-date')?.value || '';
-            const amount = parseFloat(document.getElementById('job-amount')?.value) || 0;
-            const isPaid = document.getElementById('job-status')?.value === 'true';
+            const type = document.getElementById('job-type').value;
+            const location = document.getElementById('job-location').value;
+            const date = document.getElementById('job-date').value;
+            const amount = parseFloat(document.getElementById('job-amount').value) || 0;
+            const isPaid = document.getElementById('job-status').value === 'true';
 
-            if (!date) return;
             const monthKey = date.substring(0, 7);
 
             const newEvent = {
@@ -524,7 +526,6 @@ function setupForms() {
             hasUnsavedChanges = true;
             regularForm.reset();
             if (newClientContainer) newClientContainer.style.display = 'none';
-            loadData();
             renderDashboard();
             showStatusMessage('אירוע נוצר! לחץ "שמור שינויים" לעדכון הקובץ.');
         };
@@ -542,15 +543,13 @@ function setupForms() {
 
         ichilovForm.onsubmit = (e) => {
             e.preventDefault();
-            const date = document.getElementById('ichilov-date')?.value || '';
-            const location = document.getElementById('ichilov-location')?.value || '';
-            const showType = document.getElementById('ichilov-show-type')?.value || 'רגיל';
-            const kmOneWay = parseFloat(document.getElementById('ichilov-km')?.value) || 0;
-            const timeThere = document.getElementById('ichilov-time-there')?.value || '0';
-            const timeBack = document.getElementById('ichilov-time-back')?.value || '0';
-            const isPaid = document.getElementById('ichilov-status')?.value === 'true';
-
-            if (!date) return;
+            const date = document.getElementById('ichilov-date').value;
+            const location = document.getElementById('ichilov-location').value;
+            const showType = document.getElementById('ichilov-show-type').value;
+            const kmOneWay = parseFloat(document.getElementById('ichilov-km').value) || 0;
+            const timeThere = document.getElementById('ichilov-time-there').value;
+            const timeBack = document.getElementById('ichilov-time-back').value;
+            const isPaid = document.getElementById('ichilov-status').value === 'true';
 
             const calc = calculateIchilov(showType, kmOneWay, timeThere, timeBack);
             const monthKey = date.substring(0, 7);
@@ -578,7 +577,6 @@ function setupForms() {
             currentData[monthKey].push(newEvent);
 
             hasUnsavedChanges = true;
-            loadData();
             renderDashboard();
             ichilovForm.reset();
             updateIchilovPreview();
