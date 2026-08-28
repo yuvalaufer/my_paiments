@@ -62,7 +62,7 @@ function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
         basePay = 840;
     }
 
-    // החזר ק"מ: ק"מ לכיוון אחד (שקול ל: ק"מ * 2 * 0.5)
+    // החזר ק"מ: ק"מ לכיוון אחד (ק"מ * 2 * 0.5)
     const kmPay = km; 
 
     // תוספת זמן נסיעה: קיזוז 2 שעות ראשונות (120 דקות). מעבר לזה 70 ₪ לשעה או חלק משעה
@@ -138,7 +138,7 @@ function updateClientsDropdown() {
     const previousValue = selectEl.value;
 
     const clientsSet = new Set();
-    clientsSet.add("החברה מאיכילוב"); // הבטחה שמופיע ברשימה
+    clientsSet.add("החברה מאיכילוב");
 
     Object.values(currentData).forEach(monthEvents => {
         if (Array.isArray(monthEvents)) {
@@ -483,29 +483,26 @@ function setupTabs() {
 }
 
 // ==========================================
-// 8. הוספת אירועים
+// 8. הוספת אירועים (עם הגנת אלמנטים)
 // ==========================================
 function setupForms() {
     const clientSelect = document.getElementById('client-select');
     const newClientContainer = document.getElementById('new-client-container');
+    const newClientInput = document.getElementById('new-client-name');
 
     if (clientSelect) {
         clientSelect.addEventListener('change', (e) => {
             const val = e.target.value;
-            // מעבר אוטומטי לטאב איכילוב בעת בחירת איכילוב
             if (val === 'החברה מאיכילוב') {
                 switchTabTo('ichilov-form');
                 if (newClientContainer) newClientContainer.style.display = 'none';
+                if (newClientInput) newClientInput.required = false;
             } else if (val === '__NEW__') {
-                if (newClientContainer) {
-                    newClientContainer.style.display = 'block';
-                    document.getElementById('new-client-name').required = true;
-                }
+                if (newClientContainer) newClientContainer.style.display = 'block';
+                if (newClientInput) newClientInput.required = true;
             } else {
-                if (newClientContainer) {
-                    newClientContainer.style.display = 'none';
-                    document.getElementById('new-client-name').required = false;
-                }
+                if (newClientContainer) newClientContainer.style.display = 'none';
+                if (newClientInput) newClientInput.required = false;
             }
         });
     }
@@ -516,21 +513,22 @@ function setupForms() {
             e.preventDefault();
             
             let client = clientSelect ? clientSelect.value : '';
-            if (client === '__NEW__') {
-                client = document.getElementById('new-client-name').value.trim();
+            if (client === '__NEW__' && newClientInput) {
+                client = newClientInput.value.trim();
             }
 
-            if (!client) {
+            if (!client || client === '__NEW__') {
                 alert('אנא בחר או הכנס שם לקוח');
                 return;
             }
 
-            const type = document.getElementById('job-type').value;
-            const location = document.getElementById('job-location').value;
-            const date = document.getElementById('job-date').value;
-            const amount = parseFloat(document.getElementById('job-amount').value) || 0;
-            const isPaid = document.getElementById('job-status').value === 'true';
+            const type = document.getElementById('job-type')?.value || '';
+            const location = document.getElementById('job-location')?.value || '';
+            const date = document.getElementById('job-date')?.value || '';
+            const amount = parseFloat(document.getElementById('job-amount')?.value) || 0;
+            const isPaid = document.getElementById('job-status')?.value === 'true';
 
+            if (!date) return;
             const monthKey = date.substring(0, 7);
 
             const newEvent = {
@@ -567,13 +565,15 @@ function setupForms() {
 
         ichilovForm.onsubmit = (e) => {
             e.preventDefault();
-            const date = document.getElementById('ichilov-date').value;
-            const location = document.getElementById('ichilov-location').value;
-            const showType = document.getElementById('ichilov-show-type').value;
-            const kmOneWay = parseFloat(document.getElementById('ichilov-km').value) || 0;
-            const timeThere = document.getElementById('ichilov-time-there').value;
-            const timeBack = document.getElementById('ichilov-time-back').value;
-            const isPaid = document.getElementById('ichilov-status').value === 'true';
+            const date = document.getElementById('ichilov-date')?.value || '';
+            const location = document.getElementById('ichilov-location')?.value || '';
+            const showType = document.getElementById('ichilov-show-type')?.value || 'רגיל';
+            const kmOneWay = parseFloat(document.getElementById('ichilov-km')?.value) || 0;
+            const timeThere = document.getElementById('ichilov-time-there')?.value || '0';
+            const timeBack = document.getElementById('ichilov-time-back')?.value || '0';
+            const isPaid = document.getElementById('ichilov-status')?.value === 'true';
+
+            if (!date) return;
 
             const calc = calculateIchilov(showType, kmOneWay, timeThere, timeBack);
             const monthKey = date.substring(0, 7);
