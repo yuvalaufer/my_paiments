@@ -1,10 +1,8 @@
-// נתוני האפליקציה
 let appData = {
     regularWorks: [],
     ichilovShows: []
 };
 
-// הגדרת חודש נוכחי ברירת מחדל (YYYY-MM)
 const today = new Date();
 let currentMonth = today.toISOString().substring(0, 7);
 
@@ -15,7 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
         renderAll();
     });
 
-    // הגדרת תאריך של היום בטפסים
     const todayStr = today.toISOString().substring(0, 10);
     if (document.getElementById("reg-date")) document.getElementById("reg-date").value = todayStr;
     if (document.getElementById("ichilov-date")) document.getElementById("ichilov-date").value = todayStr;
@@ -23,7 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
     loadData();
 });
 
-// טעינת נתונים מ-data.json
 async function loadData() {
     try {
         const response = await fetch("data.json?t=" + new Date().getTime());
@@ -33,30 +29,26 @@ async function loadData() {
             if (!appData.ichilovShows) appData.ichilovShows = [];
         }
     } catch (e) {
-        console.warn("לא ניתן היה לטעון data.json, משתמש בנתונים ריקים.", e);
+        console.warn("שגיאה שטעינת data.json", e);
     }
     updateClientsDropdown();
     renderAll();
 }
 
-// עדכון רשימת לקוחות נפתחת
 function updateClientsDropdown() {
     const select = document.getElementById("client-select");
     if (!select) return;
 
     const clientsSet = new Set();
-    // הבטחה ש"החברה מאיכילוב" תופיע ברשימה
     clientsSet.add("החברה מאיכילוב");
-
+    
     appData.regularWorks.forEach(w => {
         if (w.client) clientsSet.add(w.client);
     });
 
-    const clients = Array.from(clientsSet);
-
-    select.innerHTML = "";
+    select.innerHTML = '<option value="" disabled selected>בחר לקוח...</option>';
     
-    clients.forEach(client => {
+    clientsSet.forEach(client => {
         const opt = document.createElement("option");
         opt.value = client;
         opt.textContent = client;
@@ -67,23 +59,17 @@ function updateClientsDropdown() {
     optNew.value = "חדש";
     optNew.textContent = "➕ לקוח חדש...";
     select.appendChild(optNew);
-
-    showNewClientInput(false);
 }
 
-// טיפול בשינוי בבחירת הלקוח
 function handleClientSelectChange(select) {
-    const val = select.value;
-    
-    // אם נבחר "החברה מאיכילוב", נעבור מיד לטאב מחשבון איכילוב
-    if (val === "החברה מאיכילוב") {
+    if (select.value === "החברה מאיכילוב") {
         switchTab('ichilov');
-        // נחזיר את הרשימה הנפתחת לברירת מחדל לשימוש עתידי
-        select.selectedIndex = 0;
-        return;
+        select.value = "";
+    } else if (select.value === "חדש") {
+        showNewClientInput(true);
+    } else {
+        showNewClientInput(false);
     }
-
-    showNewClientInput(val === "חדש");
 }
 
 function showNewClientInput(show) {
@@ -94,24 +80,27 @@ function showNewClientInput(show) {
     }
 }
 
-// מעבר בין טאבים
 function switchTab(tabName) {
-    document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
+    document.getElementById("tab-regular").classList.remove("active");
+    document.getElementById("tab-ichilov").classList.remove("active");
+    document.getElementById("tab-summary").classList.remove("active");
+
+    document.getElementById("btn-tab-regular").classList.remove("active");
+    document.getElementById("btn-tab-ichilov").classList.remove("active");
+    document.getElementById("btn-tab-summary").classList.remove("active");
 
     if (tabName === 'regular') {
-        document.querySelectorAll(".tab-btn")[0].classList.add("active");
         document.getElementById("tab-regular").classList.add("active");
+        document.getElementById("btn-tab-regular").classList.add("active");
     } else if (tabName === 'ichilov') {
-        document.querySelectorAll(".tab-btn")[1].classList.add("active");
         document.getElementById("tab-ichilov").classList.add("active");
+        document.getElementById("btn-tab-ichilov").classList.add("active");
     } else if (tabName === 'summary') {
-        document.querySelectorAll(".tab-btn")[2].classList.add("active");
         document.getElementById("tab-summary").classList.add("active");
+        document.getElementById("btn-tab-summary").classList.add("active");
     }
 }
 
-// עזרים לזמנים
 function parseTimeToMinutes(timeStr) {
     if (!timeStr) return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -124,56 +113,41 @@ function formatMinutesToHHMM(totalMinutes) {
     return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
-// אלגוריתם חישוב איכילוב
 function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const km = parseFloat(kmOneWay) || 0;
-    
-    // החזר ק"מ: ק"מ לכיוון אחד ב-₪ (ק"מ * 2 * 0.5)
-    const kmPay = km;
+    const kmPay = km; // km * 2 * 0.5 = km
 
     const tThereMins = parseTimeToMinutes(timeThere);
     const tBackMins = parseTimeToMinutes(timeBack);
     const totalMins = tThereMins + tBackMins;
 
-    // שכר בסיס
     const basePay = (showType === "ארוך") ? 840 : 670;
 
-    // החזר זמן: קיזוז 2 שעות ראשונות (120 דקות)
     let excessMins = 0;
     let timePay = 0;
 
     if (totalMins > 120) {
         excessMins = totalMins - 120;
-        // חישוב לפי 70 ₪ לכל שעה/חלק משעה
         const extraHours = Math.ceil(excessMins / 60);
         timePay = extraHours * 70;
     }
 
     const totalPay = basePay + kmPay + timePay;
 
-    return {
-        basePay,
-        kmPay,
-        timePay,
-        totalPay,
-        totalMins,
-        excessMins,
-        totalHoursStr: formatMinutesToHHMM(totalMins),
-        excessHoursStr: formatMinutesToHHMM(excessMins)
-    };
+    return { basePay, kmPay, timePay, totalPay, totalMins, excessMins };
 }
 
-// הוספת עבודה רגילה
 function addRegularWork(e) {
     e.preventDefault();
     const select = document.getElementById("client-select");
     let clientName = select.value;
+    
     if (clientName === "חדש") {
         clientName = document.getElementById("reg-client-new").value.trim();
-        if (!clientName) {
-            alert("אנא הזן שם לקוח חדש");
-            return;
-        }
+    }
+    if (!clientName) {
+        alert("אנא לבחור או להזין שם לקוח");
+        return;
     }
 
     const newWork = {
@@ -194,7 +168,6 @@ function addRegularWork(e) {
     renderAll();
 }
 
-// הוספת מופע איכילוב
 function addIchilovShow(e) {
     e.preventDefault();
     const showType = document.getElementById("ichilov-show-type").value;
@@ -227,7 +200,6 @@ function addIchilovShow(e) {
     renderAll();
 }
 
-// מחיקת פריטים
 function deleteRegularWork(id) {
     appData.regularWorks = appData.regularWorks.filter(w => w.id !== id);
     updateClientsDropdown();
@@ -239,13 +211,11 @@ function deleteIchilovShow(id) {
     renderAll();
 }
 
-// רינדור ותצוגת כל הטבלאות
 function renderAll() {
     renderIchilovTable();
     renderSummaryTable();
 }
 
-// רינדור טבלת איכילוב המפורטת
 function renderIchilovTable() {
     const tbody = document.getElementById("ichilov-table-body");
     tbody.innerHTML = "";
@@ -256,7 +226,6 @@ function renderIchilovTable() {
     monthShows.forEach(s => {
         monthTotal += s.totalPay;
         const tr = document.createElement("tr");
-
         tr.innerHTML = `
             <td>${s.date}</td>
             <td>${s.location}</td>
@@ -271,7 +240,6 @@ function renderIchilovTable() {
         tbody.appendChild(tr);
     });
 
-    // עדכון כותרת וסיכום בתחתית הטבלה
     const [year, month] = currentMonth.split('-');
     const dateObj = new Date(year, month - 1);
     const monthName = dateObj.toLocaleString('he-IL', { month: 'long', year: 'numeric' });
@@ -280,14 +248,11 @@ function renderIchilovTable() {
     document.getElementById("ichilov-month-summary-total").textContent = `₪${monthTotal}`;
 }
 
-// רינדור הטבלה הראשית (ריכוז חודשי)
 function renderSummaryTable() {
     const tbody = document.getElementById("summary-table-body");
     tbody.innerHTML = "";
-
     let grandTotal = 0;
 
-    // 1. עבודות רגילות בחודש זה
     const monthRegular = appData.regularWorks.filter(w => w.date.startsWith(currentMonth));
     monthRegular.forEach(w => {
         grandTotal += w.total;
@@ -302,9 +267,7 @@ function renderSummaryTable() {
         tbody.appendChild(tr);
     });
 
-    // 2. מופעי איכילוב בחודש זה
     const monthIchilov = appData.ichilovShows.filter(s => s.date.startsWith(currentMonth));
-    
     if (monthIchilov.length > 0) {
         const ichilovMonthTotal = monthIchilov.reduce((sum, s) => sum + s.totalPay, 0);
         grandTotal += ichilovMonthTotal;
@@ -316,9 +279,7 @@ function renderSummaryTable() {
             <td><strong>החברה מאיכילוב</strong></td>
             <td>ריכוז מופעי איכילוב (${monthIchilov.length} מופעים)</td>
             <td><strong>₪${ichilovMonthTotal}</strong></td>
-            <td>
-                <span class="badge-link" onclick="switchTab('ichilov')">צפה בפירוט איכילוב ⬅</span>
-            </td>
+            <td><span class="badge-link" onclick="switchTab('ichilov')">צפה בפירוט איכילוב ⬅</span></td>
         `;
         tbody.appendChild(tr);
     }
