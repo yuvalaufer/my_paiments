@@ -57,7 +57,7 @@
       "location": "חברת חשמל רשלצ",
       "date": "2026-07-20",
       "amount": 750,
-      "isPaid": false,
+      "isPaid": true,
       "isIchilov": false
     }
   ]
