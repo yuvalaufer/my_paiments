@@ -13,11 +13,10 @@
             --text: #1e293b;
             --border: #e2e8f0;
             --danger: #ef4444;
-            --success: #10b981;
         }
 
         body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
@@ -41,17 +40,11 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
-        h1, h2, h3 {
-            margin: 0;
-            color: var(--text);
-        }
-
         .tabs {
             display: flex;
             gap: 8px;
             margin-bottom: 20px;
             border-bottom: 2px solid var(--border);
-            padding-bottom: 2px;
         }
 
         .tab-btn {
@@ -63,7 +56,6 @@
             color: #64748b;
             cursor: pointer;
             border-radius: 8px 8px 0 0;
-            transition: all 0.2s;
         }
 
         .tab-btn.active {
@@ -112,12 +104,6 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             font-size: 15px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        input:focus, select:focus {
-            border-color: var(--primary);
         }
 
         .btn {
@@ -127,20 +113,11 @@
             font-size: 15px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
         }
 
         .btn-primary {
             background: var(--primary);
             color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-hover);
         }
 
         .btn-danger {
@@ -164,8 +141,6 @@
 
         th {
             background-color: #f1f5f9;
-            font-weight: 600;
-            color: #475569;
         }
 
         .summary-box {
@@ -176,30 +151,16 @@
             margin-top: 16px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
             font-weight: 600;
         }
 
         .badge-link {
-            display: inline-block;
             background-color: #3b82f6;
             color: white;
             padding: 4px 10px;
             border-radius: 12px;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: bold;
             cursor: pointer;
-        }
-
-        .badge-link:hover {
-            background-color: #1d4ed8;
-        }
-
-        .summary-footer-row {
-            background-color: #f8fafc;
-            font-weight: bold;
-            font-size: 16px;
+            font-size: 13px;
         }
     </style>
 </head>
@@ -208,16 +169,16 @@
 <div class="container">
     <header>
         <h1>מערכת ניהול שכר</h1>
-        <div id="month-selector-container">
+        <div>
             <label for="month-select">חודש תצוגה:</label>
             <input type="month" id="month-select">
         </div>
     </header>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('regular')">הוספת לקוח / עבודה רגילה</button>
-        <button class="tab-btn" onclick="switchTab('ichilov')">מחשבון איכילוב</button>
-        <button class="tab-btn" onclick="switchTab('summary')">ריכוז חודשי</button>
+        <button class="tab-btn active" id="btn-tab-regular" onclick="switchTab('regular')">הוספת לקוח / עבודה רגילה</button>
+        <button class="tab-btn" id="btn-tab-ichilov" onclick="switchTab('ichilov')">מחשבון איכילוב</button>
+        <button class="tab-btn" id="btn-tab-summary" onclick="switchTab('summary')">ריכוז חודשי</button>
     </div>
 
     <!-- טאב 1: עבודה רגילה -->
@@ -233,7 +194,7 @@
                     <div class="form-group">
                         <label>שם הלקוח</label>
                         <select id="client-select" onchange="handleClientSelectChange(this)">
-                            <!-- יאוכלס דינמית מ-data.json -->
+                            <!-- מועבר דינמית -->
                         </select>
                         <input type="text" id="reg-client-new" placeholder="הכנס שם לקוח חדש" style="display: none; margin-top: 5px;">
                     </div>
@@ -294,7 +255,7 @@
         </div>
 
         <div class="card">
-            <h3 id="ichilov-table-title">פירוט מופעי איכילוב</h3>
+            <h3>פירוט מופעי איכילוב</h3>
             <table>
                 <thead>
                     <tr>
@@ -309,12 +270,10 @@
                         <th>פעולות</th>
                     </tr>
                 </thead>
-                <tbody id="ichilov-table-body">
-                    <!-- יאוכלס דינמית -->
-                </tbody>
+                <tbody id="ichilov-table-body"></tbody>
                 <tfoot>
-                    <tr class="summary-footer-row">
-                        <td colspan="7" id="ichilov-month-summary-label" style="text-align: left;">סה"כ לתשלום – חודש:</td>
+                    <tr style="font-weight: bold; background: #f8fafc;">
+                        <td colspan="7" id="ichilov-month-summary-label">סה"כ לתשלום – חודש:</td>
                         <td id="ichilov-month-summary-total">₪0</td>
                         <td></td>
                     </tr>
@@ -337,9 +296,7 @@
                         <th>קישור / פעולות</th>
                     </tr>
                 </thead>
-                <tbody id="summary-table-body">
-                    <!-- יאוכלס דינמית -->
-                </tbody>
+                <tbody id="summary-table-body"></tbody>
             </table>
             <div class="summary-box">
                 <span>סה"כ הכנסות מתוקצב לחודש זה:</span>
