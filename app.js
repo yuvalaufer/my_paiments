@@ -295,7 +295,6 @@ window.saveAllChanges = async function() {
             'Accept': 'application/vnd.github.v3+json'
         };
         
-        // 1. קבלת ה-SHA הנוכחי
         let sha = null;
         const getRes = await fetch(url, { headers });
         
@@ -307,7 +306,6 @@ window.saveAllChanges = async function() {
             throw new Error(errData.message || `שגיאת גישה (${getRes.status})`);
         }
 
-        // 2. קידוד בטוח ל-UTF8/Base64
         const jsonString = JSON.stringify(currentData, null, 2);
         const utf8Bytes = new TextEncoder().encode(jsonString);
         let binaryString = "";
@@ -316,7 +314,6 @@ window.saveAllChanges = async function() {
         }
         const contentEncoded = btoa(binaryString);
         
-        // 3. עדכון ב-GitHub
         const payload = {
             message: 'עדכון נתונים מאפליקציית התשלומים',
             content: contentEncoded
@@ -357,7 +354,7 @@ window.deleteEvent = function(id) {
 };
 
 // ==========================================
-// 6. ניהול חלון הגדרות GitHub (Modal)
+// 6. ניהול חלון הגדרות GitHub (Modal) - מוגן ומאתר שדות אוטומטית
 // ==========================================
 function setupModal() {
     const modal = document.getElementById('settings-modal');
@@ -365,41 +362,57 @@ function setupModal() {
     const closeBtn = document.querySelector('.close-btn');
     const form = document.getElementById('settings-form');
 
+    // פונקציית עזר למציאת אלמנט קלט לפי מספר מזהים אפשריים
+    const getInputElement = (...ids) => {
+        for (let id of ids) {
+            const el = document.getElementById(id);
+            if (el) return el;
+        }
+        return null;
+    };
+
     if (btn && modal) {
         btn.onclick = () => {
             const config = getGithubConfig();
-            document.getElementById('github-username').value = config.username;
-            document.getElementById('github-repo').value = config.repo;
-            document.getElementById('github-token').value = config.token;
+            
+            const userInput = getInputElement('github-username', 'username', 'gh-username');
+            const repoInput = getInputElement('github-repo', 'repo', 'gh-repo');
+            const tokenInput = getInputElement('github-token', 'token', 'gh-token', 'pat');
+
+            if (userInput) userInput.value = config.username;
+            if (repoInput) repoInput.value = config.repo;
+            if (tokenInput) tokenInput.value = config.token;
+
             modal.style.display = 'block';
         };
     }
 
     if (closeBtn && modal) {
-        closeBtn.onclick = () => {
-            modal.style.display = 'none';
-        };
+        closeBtn.onclick = () => { modal.style.display = 'none'; };
     }
 
     window.onclick = (event) => {
-        if (event.target === modal) {
-            modal.style.display = 'none';
-        }
+        if (event.target === modal) modal.style.display = 'none';
     };
 
     if (form) {
         form.onsubmit = (e) => {
             e.preventDefault();
-            const username = document.getElementById('github-username').value.trim();
-            const repo = document.getElementById('github-repo').value.trim();
-            const token = document.getElementById('github-token').value.trim();
+
+            const userInput = getInputElement('github-username', 'username', 'gh-username');
+            const repoInput = getInputElement('github-repo', 'repo', 'gh-repo');
+            const tokenInput = getInputElement('github-token', 'token', 'gh-token', 'pat');
+
+            const username = userInput ? userInput.value.trim() : '';
+            const repo = repoInput ? repoInput.value.trim() : '';
+            const token = tokenInput ? tokenInput.value.trim() : '';
 
             localStorage.setItem('gh_username', username);
             localStorage.setItem('gh_repo', repo);
             localStorage.setItem('gh_token', token);
 
             showStatusMessage('הגדרות GitHub נשמרו בהצלחה!');
-            modal.style.display = 'none';
+            if (modal) modal.style.display = 'none';
         };
     }
 }
