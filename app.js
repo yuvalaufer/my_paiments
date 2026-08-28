@@ -47,7 +47,7 @@ function formatMinutesToHHMM(totalMinutes) {
 }
 
 // ==========================================
-// 3. מחשבון איכילוב (אלגוריתם מעודכן)
+// 3. מחשבון איכילוב (נוסחה מעודכנת)
 // ==========================================
 function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const km = parseFloat(kmOneWay) || 0;
@@ -56,11 +56,8 @@ function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const tBackMins = parseTimeToMinutes(timeBack);
     const totalMins = tThereMins + tBackMins;
 
-    // שכר בסיס: רגיל = 670 ₪, ארוך = 840 ₪
-    let basePay = 670;
-    if (showType === "ארוך") {
-        basePay = 840;
-    }
+    // שכר בסיס: רגיל = ₪670, ארוך = ₪840
+    let basePay = (showType === "ארוך") ? 840 : 670;
 
     // החזר ק"מ: ק"מ לכיוון אחד (ק"מ * 2 * 0.5)
     const kmPay = km; 
@@ -138,12 +135,10 @@ function updateClientsDropdown() {
     const previousValue = selectEl.value;
 
     const clientsSet = new Set();
-    clientsSet.add("החברה מאיכילוב");
-
     Object.values(currentData).forEach(monthEvents => {
         if (Array.isArray(monthEvents)) {
             monthEvents.forEach(item => {
-                if (item.client && item.client.trim()) {
+                if (item && item.client && item.client.trim()) {
                     clientsSet.add(item.client.trim());
                 }
             });
@@ -184,6 +179,7 @@ function renderDashboard() {
 
     events.forEach(item => {
         try {
+            if (!item) return;
             const itemAmount = Number(item.amount) || 0;
             totalAll += itemAmount;
             if (item.isPaid) {
@@ -295,7 +291,7 @@ function renderSaveButton() {
 // ==========================================
 window.handleStatusChange = function(id, value) {
     const monthEvents = currentData[selectedMonth] || [];
-    const targetEvent = monthEvents.find(item => item.id === id);
+    const targetEvent = monthEvents.find(item => item && item.id === id);
 
     if (!targetEvent) return;
 
@@ -303,7 +299,7 @@ window.handleStatusChange = function(id, value) {
 
     if (targetEvent.isIchilov || targetEvent.client === 'החברה מאיכילוב') {
         monthEvents.forEach(item => {
-            if (item.isIchilov || item.client === 'החברה מאיכילוב') {
+            if (item && (item.isIchilov || item.client === 'החברה מאיכילוב')) {
                 item.isPaid = newStatus;
             }
         });
@@ -386,7 +382,7 @@ window.saveAllChanges = async function() {
 window.deleteEvent = function(id) {
     if (!confirm("האם אתה בטוח שברצונך למחוק אירוע זה?")) return;
     if (currentData[selectedMonth]) {
-        currentData[selectedMonth] = currentData[selectedMonth].filter(item => item.id !== id);
+        currentData[selectedMonth] = currentData[selectedMonth].filter(item => item && item.id !== id);
         hasUnsavedChanges = true;
         renderDashboard();
         showStatusMessage('האירוע נמחק. זכור ללחוץ על "שמור שינויים"');
@@ -459,50 +455,38 @@ function setupModal() {
 // ==========================================
 // 7. ניהול לשוניות (Tabs)
 // ==========================================
-function switchTabTo(tabId) {
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    tabBtns.forEach(b => {
-        if (b.getAttribute('data-tab') === tabId) b.classList.add('active');
-        else b.classList.remove('active');
-    });
-
-    document.querySelectorAll('.tab-content').forEach(c => {
-        if (c.id === tabId) c.classList.add('active');
-        else c.classList.remove('active');
-    });
-}
-
 function setupTabs() {
     const tabBtns = document.querySelectorAll('.tab-btn');
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            btn.classList.add('active');
             const tabId = btn.getAttribute('data-tab');
-            switchTabTo(tabId);
+            const targetTab = document.getElementById(tabId);
+            if (targetTab) targetTab.classList.add('active');
         });
     });
 }
 
 // ==========================================
-// 8. הוספת אירועים (עם הגנת אלמנטים)
+// 8. הוספת אירועים
 // ==========================================
 function setupForms() {
     const clientSelect = document.getElementById('client-select');
     const newClientContainer = document.getElementById('new-client-container');
-    const newClientInput = document.getElementById('new-client-name');
 
-    if (clientSelect) {
+    if (clientSelect && newClientContainer) {
         clientSelect.addEventListener('change', (e) => {
-            const val = e.target.value;
-            if (val === 'החברה מאיכילוב') {
-                switchTabTo('ichilov-form');
-                if (newClientContainer) newClientContainer.style.display = 'none';
-                if (newClientInput) newClientInput.required = false;
-            } else if (val === '__NEW__') {
-                if (newClientContainer) newClientContainer.style.display = 'block';
-                if (newClientInput) newClientInput.required = true;
+            if (e.target.value === '__NEW__') {
+                newClientContainer.style.display = 'block';
+                const nameInput = document.getElementById('new-client-name');
+                if (nameInput) nameInput.required = true;
             } else {
-                if (newClientContainer) newClientContainer.style.display = 'none';
-                if (newClientInput) newClientInput.required = false;
+                newClientContainer.style.display = 'none';
+                const nameInput = document.getElementById('new-client-name');
+                if (nameInput) nameInput.required = false;
             }
         });
     }
@@ -513,11 +497,11 @@ function setupForms() {
             e.preventDefault();
             
             let client = clientSelect ? clientSelect.value : '';
-            if (client === '__NEW__' && newClientInput) {
-                client = newClientInput.value.trim();
+            if (client === '__NEW__') {
+                client = document.getElementById('new-client-name')?.value.trim() || '';
             }
 
-            if (!client || client === '__NEW__') {
+            if (!client) {
                 alert('אנא בחר או הכנס שם לקוח');
                 return;
             }
