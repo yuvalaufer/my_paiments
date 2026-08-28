@@ -99,7 +99,7 @@ function updateIchilovPreview() {
 }
 
 // ==========================================
-// 4. טעינה ורינדור הנתונים (Dashboard)
+// 4. טעינה ורינדור הנתונים (הגרסה המקורית שעבדה)
 // ==========================================
 async function loadData() {
     try {
@@ -107,7 +107,26 @@ async function loadData() {
         if (!response.ok) throw new Error("שגיאה בטעינת data.json");
         currentData = await response.json();
         
-        populateMonthDropdown();
+        const monthPicker = document.getElementById('month-select');
+        if (monthPicker) {
+            monthPicker.innerHTML = '';
+            const availableMonths = Object.keys(currentData);
+            
+            if (availableMonths.length > 0) {
+                availableMonths.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m;
+                    monthPicker.appendChild(opt);
+                });
+                selectedMonth = availableMonths[0];
+                monthPicker.value = selectedMonth;
+            } else {
+                const now = new Date();
+                selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            }
+        }
+        
         renderDashboard();
     } catch (err) {
         console.error("שגיאה בטעינת הנתונים:", err);
@@ -115,43 +134,16 @@ async function loadData() {
     }
 }
 
-function populateMonthDropdown() {
-    const monthPicker = document.getElementById('month-select');
-    if (!monthPicker) return;
-
-    monthPicker.innerHTML = '';
-    const availableMonths = Object.keys(currentData).sort().reverse();
-
-    if (availableMonths.length === 0) {
-        const now = new Date();
-        selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const opt = document.createElement('option');
-        opt.value = selectedMonth;
-        opt.textContent = selectedMonth;
-        monthPicker.appendChild(opt);
-    } else {
-        availableMonths.forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m;
-            opt.textContent = m;
-            monthPicker.appendChild(opt);
-        });
-
-        if (!selectedMonth || !availableMonths.includes(selectedMonth)) {
-            selectedMonth = availableMonths[0];
-        }
-    }
-
-    monthPicker.value = selectedMonth;
-}
-
 function updateClientsDropdown() {
     const selectEl = document.getElementById('client-select');
     if (!selectEl) return;
 
     const previousValue = selectEl.value;
-
     const clientsSet = new Set();
+    
+    // מוסיף קבוע את איכילוב כדי לוודא שקיים תמיד
+    clientsSet.add("החברה מאיכילוב");
+
     Object.values(currentData).forEach(monthEvents => {
         if (Array.isArray(monthEvents)) {
             monthEvents.forEach(item => {
@@ -549,7 +541,7 @@ function setupForms() {
             hasUnsavedChanges = true;
             regularForm.reset();
             if (newClientContainer) newClientContainer.style.display = 'none';
-            populateMonthDropdown();
+            loadData();
             renderDashboard();
             showStatusMessage('אירוע נוצר! לחץ "שמור שינויים" לעדכון הקובץ.');
         };
@@ -603,7 +595,7 @@ function setupForms() {
             currentData[monthKey].push(newEvent);
 
             hasUnsavedChanges = true;
-            populateMonthDropdown();
+            loadData();
             renderDashboard();
             ichilovForm.reset();
             updateIchilovPreview();
