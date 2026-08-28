@@ -47,28 +47,21 @@ function formatMinutesToHHMM(totalMinutes) {
 }
 
 // ==========================================
-// 3. מחשבון איכילוב (נוסחה מעודכנת)
+// 3. מחשבון איכילוב (המקורי)
 // ==========================================
 function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const km = parseFloat(kmOneWay) || 0;
-
     const tThereMins = parseTimeToMinutes(timeThere);
     const tBackMins = parseTimeToMinutes(timeBack);
     const totalMins = tThereMins + tBackMins;
 
-    // שכר בסיס: רגיל = ₪670, ארוך = ₪840
-    let basePay = (showType === "ארוך") ? 840 : 670;
-
-    // החזר ק"מ: ק"מ לכיוון אחד
-    const kmPay = km; 
-
-    // תוספת זמן נסיעה: קיזוז 2 שעות ראשונות (120 דקות). מעבר לזה 70 ₪ לשעה או חלק משעה
-    let excessMins = 0;
+    let basePay = (showType === "ארוך") ? 800 : 600;
+    const kmPay = km * 2; 
     let timePay = 0;
+    
     if (totalMins > 120) {
-        excessMins = totalMins - 120;
-        const extraHours = Math.ceil(excessMins / 60);
-        timePay = extraHours * 70;
+        const excessMins = totalMins - 120;
+        timePay = (excessMins / 60) * 50;
     }
 
     const totalPay = basePay + kmPay + timePay;
@@ -79,9 +72,7 @@ function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
         timePay,
         totalPay,
         totalMins,
-        excessMins,
-        totalHoursStr: formatMinutesToHHMM(totalMins),
-        excessHoursStr: formatMinutesToHHMM(excessMins)
+        totalHoursStr: formatMinutesToHHMM(totalMins)
     };
 }
 
@@ -94,12 +85,12 @@ function updateIchilovPreview() {
     const calc = calculateIchilov(showType, km, timeThere, timeBack);
     const previewEl = document.getElementById('calc-breakdown');
     if (previewEl) {
-        previewEl.innerHTML = `שכר בסיס: ₪${calc.basePay} | נסיעות: ₪${calc.kmPay} (${km} ק"מ) | תוספת זמן: ₪${calc.timePay} (${calc.excessHoursStr}) | <strong>סה"כ: ₪${calc.totalPay}</strong>`;
+        previewEl.innerHTML = `שכר בסיס: ₪${calc.basePay} | נסיעות: ₪${calc.kmPay} | זמן: ₪${calc.timePay} | <strong>סה"כ: ₪${calc.totalPay}</strong>`;
     }
 }
 
 // ==========================================
-// 4. טעינה ורינדור הנתונים (הגרסה המקורית שעבדה)
+// 4. טעינה ורינדור הנתונים (המקורי)
 // ==========================================
 async function loadData() {
     try {
@@ -121,9 +112,6 @@ async function loadData() {
                 });
                 selectedMonth = availableMonths[0];
                 monthPicker.value = selectedMonth;
-            } else {
-                const now = new Date();
-                selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             }
         }
         
@@ -141,9 +129,6 @@ function updateClientsDropdown() {
     const previousValue = selectEl.value;
     const clientsSet = new Set();
     
-    // מוסיף קבוע את איכילוב כדי לוודא שקיים תמיד
-    clientsSet.add("החברה מאיכילוב");
-
     Object.values(currentData).forEach(monthEvents => {
         if (Array.isArray(monthEvents)) {
             monthEvents.forEach(item => {
@@ -223,7 +208,6 @@ function renderDashboard() {
 
             if (item.isIchilov && ichilovList) {
                 const iData = item.ichilovData || {};
-                
                 const tThere = iData.timeThere || 0;
                 const tBack = iData.timeBack || 0;
                 const totalMins = parseTimeToMinutes(tThere) + parseTimeToMinutes(tBack);
@@ -242,7 +226,6 @@ function renderDashboard() {
                     <td>${iData.showType || item.type || ''}</td>
                     <td>${Number(iData.kmOneWay) || 0} ק"מ</td>
                     <td>${calc.totalHoursStr || formatMinutesToHHMM(totalMins)}</td>
-                    <td>${calc.excessHoursStr || '0:00'}</td>
                     <td>₪${calc.basePay || 0}</td>
                     <td>₪${calc.kmPay || 0}</td>
                     <td>₪${calc.timePay || 0}</td>
