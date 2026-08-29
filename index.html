@@ -101,31 +101,44 @@
                             <input type="date" id="ichilov-date" required>
                         </div>
                         <div class="form-group">
-                            <label for="ichilov-location">מיקום המופע</label>
+                            <label for="ichilov-location">מיקום עיקרי / מחלקה</label>
                             <input type="text" id="ichilov-location" placeholder="שם בית החולים / מחלקה" required>
                         </div>
                         <div class="form-group">
-                            <label for="ichilov-show-type">סוג מופע</label>
-                            <select id="ichilov-show-type">
-                                <option value="רגיל">מופע רגיל (בסיס ₪670)</option>
-                                <option value="ארוך">מופע ארוך (בסיס ₪840)</option>
+                            <label for="ichilov-shows-count">כמות מופעים ביום</label>
+                            <select id="ichilov-shows-count">
+                                <option value="1">מופע אחד</option>
+                                <option value="2">2 מופעים</option>
+                                <option value="3">3 מופעים</option>
                             </select>
                         </div>
                     </div>
+
+                    <!-- אזור הגדרת סוגי מופעים דינמי -->
+                    <div id="ichilov-shows-types-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <!-- יתמלא דינמית בהתאם לכמות המופעים -->
+                    </div>
+
+                    <!-- אזור הגדרת מקטעי ק"מ דינמי -->
+                    <div id="ichilov-km-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <!-- יתמלא דינמית בהתאם לכמות המופעים -->
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="ichilov-km">קילומטראז' (כיוון אחד ב-km)</label>
-                            <input type="number" id="ichilov-km" min="0" step="0.1" placeholder="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="ichilov-time-there">זמן נסיעה הלוך (דקות)</label>
+                            <label for="ichilov-time-there">זמן נסיעה הלוך ראשון (דקות)</label>
                             <input type="number" id="ichilov-time-there" min="0" placeholder="0" required>
                         </div>
                         <div class="form-group">
-                            <label for="ichilov-time-back">זמן נסיעה חזור (דקות)</label>
+                            <label for="ichilov-time-back">זמן נסיעה חזור אחרון (דקות)</label>
                             <input type="number" id="ichilov-time-back" min="0" placeholder="0" required>
                         </div>
+                        <div class="form-group" id="ichilov-extra-times-container" style="display: none;">
+                            <label for="ichilov-time-transfers">זמן נסיעה במעברים בין מופעים (דקות)</label>
+                            <input type="number" id="ichilov-time-transfers" min="0" placeholder="0" value="0">
+                        </div>
                     </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="ichilov-status">סטטוס תשלום</label>
@@ -179,13 +192,13 @@
                         <tr>
                             <th>תאריך</th>
                             <th>מיקום</th>
-                            <th>סוג מופע</th>
-                            <th>ק"מ (הלוך+חזור)</th>
+                            <th>פירוט מופעים</th>
+                            <th>סה"כ ק"מ (מסלול)</th>
                             <th>זמן נסיעה כולל</th>
                             <th>שכר בסיס</th>
                             <th>נסיעות</th>
                             <th>תוספת זמן</th>
-                            <th>סה"כ למופע</th>
+                            <th>סה"כ ליום</th>
                             <th>סטטוס</th>
                             <th>פעולות</th>
                         </tr>
@@ -224,7 +237,7 @@
 
     <!-- חלונית מודאל מוקפצת למחשבון איכילוב דרך הטופס הראשי -->
     <div id="ichilov-modal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width: 650px;">
             <span class="close-btn" id="close-ichilov-modal">&times;</span>
             <h2>🏥 מחשבון מופע - איכילוב</h2>
             <form id="modal-ichilov-form">
@@ -234,31 +247,42 @@
                         <input type="date" id="modal-ichilov-date" required>
                     </div>
                     <div class="form-group">
-                        <label for="modal-ichilov-location">מיקום המופע</label>
+                        <label for="modal-ichilov-location">מיקום עיקרי / מחלקה</label>
                         <input type="text" id="modal-ichilov-location" placeholder="שם בית החולים / מחלקה" required>
                     </div>
                     <div class="form-group">
-                        <label for="modal-ichilov-show-type">סוג מופע</label>
-                        <select id="modal-ichilov-show-type">
-                            <option value="רגיל">מופע רגיל (בסיס ₪670)</option>
-                            <option value="ארוך">מופע ארוך (בסיס ₪840)</option>
+                        <label for="modal-ichilov-shows-count">כמות מופעים ביום</label>
+                        <select id="modal-ichilov-shows-count">
+                            <option value="1">מופע אחד</option>
+                            <option value="2">2 מופעים</option>
+                            <option value="3">3 מופעים</option>
                         </select>
                     </div>
                 </div>
+
+                <div id="modal-ichilov-shows-types-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <!-- יתמלא דינמית במודאל -->
+                </div>
+
+                <div id="modal-ichilov-km-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <!-- יתמלא דינמית במודאל -->
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="modal-ichilov-km">קילומטראז' (כיוון אחד ב-km)</label>
-                        <input type="number" id="modal-ichilov-km" min="0" step="0.1" placeholder="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="modal-ichilov-time-there">זמן נסיעה הלוך (דקות)</label>
+                        <label for="modal-ichilov-time-there">זמן נסיעה הלוך ראשון (דקות)</label>
                         <input type="number" id="modal-ichilov-time-there" min="0" placeholder="0" required>
                     </div>
                     <div class="form-group">
-                        <label for="modal-ichilov-time-back">זמן נסיעה חזור (דקות)</label>
+                        <label for="modal-ichilov-time-back">זמן נסיעה חזור אחרון (דקות)</label>
                         <input type="number" id="modal-ichilov-time-back" min="0" placeholder="0" required>
                     </div>
+                    <div class="form-group" id="modal-ichilov-extra-times-container" style="display: none;">
+                        <label for="modal-ichilov-time-transfers">זמן נסיעה במעברים בין מופעים (דקות)</label>
+                        <input type="number" id="modal-ichilov-time-transfers" min="0" placeholder="0" value="0">
+                    </div>
                 </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="modal-ichilov-status">סטטוס תשלום</label>
