@@ -112,9 +112,11 @@ async function loadData() {
     if (config && config.token && config.username && config.repo) {
         try {
             showStatus('טוען נתונים מ-GitHub...', 'info');
-            const data = await fetchFromGitHub(config);
-            if (data) {
-                currentData = data;
+            const githubResult = await fetchFromGitHubWithSha(config);
+            if (githubResult && githubResult.data) {
+                currentData = githubResult.data;
+                // גיבוי מקומי של מה שירד מגיטהאב
+                localStorage.setItem('app_saved_data', JSON.stringify(currentData));
                 showStatus('הנתונים נטענו בהצלחה מ-GitHub', 'success');
                 return;
             }
@@ -166,31 +168,6 @@ async function saveData() {
 
 const DATA_FILE_PATH = 'data.json';
 
-async function fetchFromGitHub(config) {
-    const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${DATA_FILE_PATH}`;
-    const response = await fetch(url, {
-        headers: {
-            'Authorization': `token ${config.token}`,
-            'Accept': 'application/vnd.github.v3+json'
-        }
-    });
-
-    if (response.status === 404) {
-        return null; // הקובץ עוד לא קיים
-    }
-    if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.statusText}`);
-    }
-
-    const fileData = await response.json();
-    const contentDecoded = decodeURIComponent(escape(atob(fileData.content)));
-    return {
-        parsedData: JSON.parse(contentDecoded),
-        sha: fileData.sha
-    };
-}
-
-// פונקציית עזר עוקפת לטעינה שחושפת את ה-sha
 async function fetchFromGitHubWithSha(config) {
     const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${DATA_FILE_PATH}`;
     const response = await fetch(url, {
@@ -199,7 +176,9 @@ async function fetchFromGitHubWithSha(config) {
             'Accept': 'application/vnd.github.v3+json'
         }
     });
-    if (!response.ok) return { sha: null };
+    if (response.status === 404) return { data: null, sha: null };
+    if (!response.ok) throw new Error(`GitHub API error: ${response.statusText}`);
+    
     const fileData = await response.json();
     const contentDecoded = decodeURIComponent(escape(atob(fileData.content)));
     return {
@@ -209,7 +188,6 @@ async function fetchFromGitHubWithSha(config) {
 }
 
 async function saveToGitHub(config, dataObj) {
-    // נביא קודם את ה-sha העדכני של הקובץ אם קיים
     const existing = await fetchFromGitHubWithSha(config);
     const sha = existing.sha;
 
@@ -275,22 +253,13 @@ function initIchilovCalculatorLogic(mode = 'main') {
     const showsTypesContainer = document.getElementById(`${prefix}-shows-types-container`);
     const kmContainer = document.getElementById(`${prefix}-km-container`);
     const extraTimesContainer = document.getElementById(`${prefix}-extra-times-container`);
-    
-    // שדות זמן נסיעה
-    const thereHrsInput = document.getElementById(`${prefix}-time-there-hrs`);
-    const thereMinsInput = document.getElementById(`${prefix}-time-there-mins`);
-    const backHrsInput = document.getElementById(`${prefix}-time-back-hrs`);
-    const backMinsInput = document.getElementById(`${prefix}-time-back-mins`);
-    const transHrsInput = document.getElementById(`${prefix}-time-transfers-hrs`);
-    const transMinsInput = document.getElementById(`${prefix}-time-transfers-mins`);
 
     function updateDynamicFields() {
         const count = parseInt(showsCountSelect.value);
         
-        // יצירת בחירת סוג מופע לכל מופע
+        // יצירת בחירת סוג מופע לכל מופע בצורה תקינה
         let typesHtml = '<strong style="display: block; margin-bottom: 8px;">סוגי מופעים:</strong><div class="form-row">';
         for (let i = 1; i <= count; i++) {
-            typesHtml.innerHTML += ''; // נבנה באופן נקי למטה
             typesHtml += `
                 <div class="form-group">
                     <label>מופע #${i}</label>
@@ -323,9 +292,9 @@ function initIchilovCalculatorLogic(mode = 'main') {
                     <input type="number" id="${prefix}-km-transfers" min="0" step="any" value="0">
                 </div>
             `;
-            extraTimesContainer.style.display = 'flex';
+            if (extraTimesContainer) extraTimesContainer.style.display = 'flex';
         } else {
-            extraTimesContainer.style.display = 'none';
+            if (extraTimesContainer) extraTimesContainer.style.display = 'none';
         }
         kmHtml += '</div>';
         kmContainer.innerHTML = kmHtml;
@@ -335,18 +304,18 @@ function initIchilovCalculatorLogic(mode = 'main') {
         calculateIchilovPreview(prefix);
     }
 
-    showsCountSelect.addEventListener('change', updateDynamicFields);
-    
-    // הרצה ראשונית לבניית השדות
-    updateDynamicFields();
+    if (showsCountSelect) {
+        showsCountSelect.addEventListener('change', updateDynamicFields);
+        updateDynamicFields();
+    }
 }
 
 function attachCalculationListeners(prefix) {
     const container = document.getElementById(prefix === 'modal' ? 'ichilov-modal' : 'add-ichilov-form');
-    // האזנה לכל שינוי בתוך הטופס הרלוונטי לצורך עדכון תצוגה מקדימה
+    if (!container) return;
+    
     const inputs = container.querySelectorAll('input, select');
     inputs.forEach(input => {
-        // הסרת מאזין קודם למניעת כפילויות והוספת חדש
         input.removeEventListener('input', handleInputEvent);
         input.addEventListener('input', handleInputEvent);
         input.removeEventListener('change', handleInputEvent);
@@ -379,20 +348,18 @@ function calculateIchilovPreview(prefix) {
 }
 
 function computeIchilovValues(prefix) {
-    const showsCount = parseInt(document.getElementById(`${prefix}-shows-count`).value);
+    const showsCount = parseInt(document.getElementById(`${prefix}-shows-count`).value) || 1;
     
-    // קריאת מרחקים
     const kmThere = parseFloat(document.getElementById(`${prefix}-km-there`)?.value) || 0;
     const kmBack = parseFloat(document.getElementById(`${prefix}-km-back`)?.value) || 0;
     const kmTransfers = showsCount > 1 ? (parseFloat(document.getElementById(`${prefix}-km-transfers`)?.value) || 0) : 0;
     
     const totalKm = kmThere + kmBack + kmTransfers;
 
-    // קריאת זמנים (הפרדה לשעות ודקות)
-    const thereHrs = parseInt(document.getElementById(`${prefix}-time-there-hrs`).value) || 0;
-    const thereMins = parseInt(document.getElementById(`${prefix}-time-there-mins`).value) || 0;
-    const backHrs = parseInt(document.getElementById(`${prefix}-time-back-hrs`).value) || 0;
-    const backMins = parseInt(document.getElementById(`${prefix}-time-back-mins`).value) || 0;
+    const thereHrs = parseInt(document.getElementById(`${prefix}-time-there-hrs`)?.value) || 0;
+    const thereMins = parseInt(document.getElementById(`${prefix}-time-there-mins`)?.value) || 0;
+    const backHrs = parseInt(document.getElementById(`${prefix}-time-back-hrs`)?.value) || 0;
+    const backMins = parseInt(document.getElementById(`${prefix}-time-back-mins`)?.value) || 0;
     
     let transHrs = 0;
     let transMins = 0;
@@ -406,30 +373,25 @@ function computeIchilovValues(prefix) {
     
     const totalTimeFormatted = `${Math.floor(totalMinutes / 60)} שעות ו-${totalMinutes % 60} דקות`;
 
-    // חישוב שכר מופעים
     let basePay = ICHILOV_CONFIG.baseRate;
-    let showsBreakdownText = `מופע 1: ₪${ICHILOV_CONFIG.baseRate}`;
-    
     for (let i = 2; i <= showsCount; i++) {
         basePay += ICHILOV_CONFIG.extraShowRate;
-        showsBreakdownText += `, מופע ${i}: ₪${ICHILOV_CONFIG.extraShowRate}`;
     }
 
-    // חישוב נסיעות וזמן
     const kmPay = totalKm * ICHILOV_CONFIG.kmRate;
-    // שעות מזוכות: מינימום שעות נסיעה (למשל 1.5) או הזמן בפועל הגבוה מביניהם
     const billedHours = Math.max(totalHoursDecimal, ICHILOV_CONFIG.minTravelHours);
     const timePay = billedHours * ICHILOV_CONFIG.hourlyRate;
     const travelPay = kmPay + timePay;
 
     const totalPay = basePay + travelPay;
 
-    // בניית מחרוזת פירוט מופעים לתצוגה בטבלה
     let showsTypesSummary = [];
     for (let i = 1; i <= showsCount; i++) {
         const typeVal = document.getElementById(`${prefix}-show-type-${i}`)?.value || 'standard';
         showsTypesSummary.push(`מופע ${i} (${typeVal === 'standard' ? 'רגיל' : 'מיוחד'})`);
     }
+
+    const statusEl = document.getElementById(prefix === 'modal' ? 'modal-ichilov-status' : 'ichilov-status');
 
     return {
         showsCount,
@@ -441,7 +403,7 @@ function computeIchilovValues(prefix) {
         basePay,
         travelPay,
         totalPay,
-        status: document.getElementById(prefix === 'modal' ? 'modal-ichilov-status' : 'ichilov-status').value === 'true'
+        status: statusEl ? statusEl.value === 'true' : false
     };
 }
 
@@ -476,7 +438,6 @@ function handleClientSelectChange(e) {
 }
 
 function initFormListeners() {
-    // טופס עבודה רגילה
     document.getElementById('add-regular-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -486,7 +447,7 @@ function initFormListeners() {
         if (clientName === 'ADD_NEW') {
             const newNameInput = document.getElementById('new-client-name');
             clientName = newNameInput.value.trim();
-            if (newNameInput && !currentData.clients.includes(clientName)) {
+            if (newNameInput && clientName && !currentData.clients.includes(clientName)) {
                 currentData.clients.push(clientName);
             }
         }
@@ -513,7 +474,6 @@ function initFormListeners() {
         showStatus('האירוע נוסף בהצלחה!', 'success');
     });
 
-    // טופס איכילוב הראשי
     document.getElementById('add-ichilov-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -528,9 +488,7 @@ function initFormListeners() {
             ...computed
         };
 
-        // הוספה גם לטבלת מופעי איכילוב וגם כשורת תשלום כללית
         currentData.ichilovShows.push(ichilovRecord);
-        
         currentData.payments.push({
             id: 'pay_ichilov_' + Date.now(),
             date: dateVal,
@@ -551,7 +509,6 @@ function initFormListeners() {
         showStatus('מופע איכילוב נוסף בהצלחה!', 'success');
     });
 
-    // טופס איכילוב במודאל
     document.getElementById('modal-ichilov-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -585,7 +542,6 @@ function initFormListeners() {
         showStatus('מופע איכילוב נוסף בהצלחה!', 'success');
     });
 
-    // הגדרות GitHub
     document.getElementById('settings-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const config = {
@@ -596,26 +552,29 @@ function initFormListeners() {
         localStorage.setItem(STORAGE_KEYS.GITHUB_CONFIG, JSON.stringify(config));
         closeSettingsModal();
         showStatus('הגדרות GitHub נשמרו בהצלחה! מנסה לסנכרן...', 'success');
-        loadData().then(() => renderAll());
+        loadData().then(() => {
+            populateClientDropdown();
+            renderAll();
+        });
     });
 }
 
 /* ==========================================
-   ניהול חלוניות מודאל (Settings & Ichilov Modal)
+   ניהול חלוניות מודאל
    ========================================== */
 
 function initModalListeners() {
     const settingsModal = document.getElementById('settings-modal');
     const settingsBtn = document.getElementById('settings-btn');
-    const closeSettings = settingsModal.querySelector('.close-btn');
+    if (settingsBtn && settingsModal) {
+        const closeSettings = settingsModal.querySelector('.close-btn');
+        settingsBtn.addEventListener('click', () => settingsModal.style.display = 'block');
+        if (closeSettings) closeSettings.addEventListener('click', () => settingsModal.style.display = 'none');
+    }
 
-    settingsBtn.addEventListener('click', () => settingsModal.style.display = 'block');
-    closeSettings.addEventListener('click', () => settingsModal.style.display = 'none');
-
-    // מודאל איכילוב (ניתן לפתוח דרך כפתור או פעולת עזר בעתיד)
     const ichilovModal = document.getElementById('ichilov-modal');
     const closeIchilov = document.getElementById('close-ichilov-modal');
-    closeIchilov.addEventListener('click', closeIchilovModal);
+    if (closeIchilov) closeIchilov.addEventListener('click', closeIchilovModal);
 
     window.addEventListener('click', (e) => {
         if (e.target === settingsModal) settingsModal.style.display = 'none';
@@ -636,16 +595,17 @@ function closeIchilovModal() {
    ========================================== */
 
 function renderAll() {
-    const selectedMonth = document.getElementById('month-select').value; // פורמט YYYY-MM
+    const monthSelect = document.getElementById('month-select');
+    if (!monthSelect) return;
+    const selectedMonth = monthSelect.value;
     
-    // סינון תשלומים לפי חודש נבחר
     const filteredPayments = currentData.payments.filter(p => p.date && p.date.startsWith(selectedMonth));
     const filteredIchilov = currentData.ichilovShows.filter(i => i.date && i.date.startsWith(selectedMonth));
 
     renderSummary(filteredPayments);
     renderPaymentsTable(filteredPayments);
     renderIchilovTable(filteredIchilov);
-    renderGlobalUnpaidTable(); // מציג חובות פתוחים מכל החודשים בלשונית הייעודית
+    renderGlobalUnpaidTable();
 }
 
 function renderSummary(payments) {
@@ -677,7 +637,6 @@ function renderPaymentsTable(payments) {
         return;
     }
 
-    // מיון לפי תאריך
     payments.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     let html = '';
@@ -746,10 +705,7 @@ function renderGlobalUnpaidTable() {
     const summaryEl = document.getElementById('total-unpaid-summary');
     if (!tbody) return;
 
-    // איסוף כל התשלומים שלא שולמו מכל החודשים
     const unpaidPayments = currentData.payments.filter(p => !p.paid);
-    
-    // מיון לפי תאריך מהישן לחדש
     unpaidPayments.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     let totalUnpaidSum = 0;
@@ -793,7 +749,6 @@ async function togglePaymentStatus(id) {
     if (payment) {
         payment.paid = !payment.paid;
         
-        // אם מדובר באיכילוב, נעדכן גם את הרשומת איכילוב המקושרת
         if (payment.refId) {
             const ichilov = currentData.ichilovShows.find(i => i.id === payment.refId);
             if (ichilov) ichilov.status = payment.paid;
@@ -810,7 +765,6 @@ async function toggleIchilovStatus(id) {
     if (ichilov) {
         ichilov.status = !ichilov.status;
         
-        // עדכון התשלום המקושר בטבלה הכללית
         const payment = currentData.payments.find(p => p.refId === id);
         if (payment) payment.paid = ichilov.status;
 
@@ -825,11 +779,10 @@ async function markAsPaidAndRefresh(id) {
 }
 
 async function deletePayment(id) {
-    if (!confirm('האם אתה בטוחที่คุณ מעוניין למחוק אירוע זה?')) return;
+    if (!confirm('האם אתה בטוח שברצונך למחוק אירוע זה?')) return;
     
     const payment = currentData.payments.find(p => p.id === id);
     if (payment && payment.refId) {
-        // מחיקת רשומת איכילוב המקושרת
         currentData.ichilovShows = currentData.ichilovShows.filter(i => i.id !== payment.refId);
     }
 
@@ -850,7 +803,6 @@ async function deleteIchilovRecord(id) {
     showStatus('מופע איכילוב נמחק בהצלחה', 'info');
 }
 
-// פונקציית עזר למניעת XSS בטוח
 function escapeHtml(str) {
     if (!str) return '';
     return str.toString()
