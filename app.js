@@ -1,874 +1,862 @@
-// ==========================================
-// 1. משתנים גלובליים וניהול הגדרות GitHub
-// ==========================================
-let currentData = {};
-let selectedMonth = "";
-let hasUnsavedChanges = false;
+// משתנים גלובליים למצב האפליקציה
+let currentData = {
+    clients: [],
+    payments: [],
+    ichilovShows: []
+};
 
-function getGithubConfig() {
-    return {
-        username: (localStorage.getItem('gh_username') || localStorage.getItem('username') || localStorage.getItem('gh-username') || '').trim(),
-        repo: (localStorage.getItem('gh_repo') || localStorage.getItem('repo') || '').trim(),
-        token: (localStorage.getItem('gh_token') || localStorage.getItem('token') || '').trim()
-    };
-}
+// מפתח לאחסון מקומי ונתוני GitHub
+const STORAGE_KEYS = {
+    GITHUB_CONFIG: 'github_config',
+    CURRENT_MONTH: 'current_selected_month'
+};
 
-function showStatusMessage(text, isError = false) {
-    const statusEl = document.getElementById('status-message');
-    if (statusEl) {
-        statusEl.textContent = text;
-        statusEl.style.color = isError ? '#d9534f' : '#5cb85c';
-        setTimeout(() => { statusEl.textContent = ''; }, 5000);
-    }
-}
+// הגדרות ברירת מחדל לחישוב איכילוב
+const ICHILOV_CONFIG = {
+    baseRate: 450,          // שכר בסיס למופע ראשון
+    extraShowRate: 300,     // שכר למופע נוסף באותו יום
+    kmRate: 2.2,            // תעריף לק"מ
+    hourlyRate: 60,         // תעריף לשעה עבור זמני נסיעה
+    minTravelHours: 1.5     // מינימום שעות נסיעה מזוכות (אם הנסיעה קצרה ממנו)
+};
 
-// ==========================================
-// 2. פונקציות עזר לבדיקה והמרת זמנים
-// ==========================================
-function parseTimeToMinutes(val) {
-    if (!val && val !== 0) return 0;
-    if (typeof val === 'number') return val;
+document.addEventListener('DOMContentLoaded', () => {
+    // אתחול חודש נוכחי בבורר החודשים (או טעינה מה-LocalStorage)
+    initMonthSelector();
     
-    const str = String(val).trim();
-    if (str.includes(':')) {
-        const parts = str.split(':');
-        const hrs = parseInt(parts[0], 10) || 0;
-        const mins = parseInt(parts[1], 10) || 0;
-        return (hrs * 60) + mins;
-    }
-    return parseFloat(str) || 0;
-}
+    // טעינת הגדרות GitHub אם קיימות
+    loadGitHubConfigToUI();
 
-function formatMinutesToHHMM(totalMinutes) {
-    if (isNaN(totalMinutes) || totalMinutes <= 0) return "0:00";
-    const hrs = Math.floor(totalMinutes / 60);
-    const mins = Math.round(totalMinutes % 60);
-    return `${hrs}:${mins < 10 ? '0' : ''}${mins}`;
-}
+    // אתחול מאזיני אירועים ללשוניות
+    initTabs();
 
-// ==========================================
-// 3. מחשבון איכילוב (עם תמיכה במספר מופעים ומקטעי ק"מ)
-// ==========================================
-function calculateIchilovAdvanced(showsTypesArray, kmSegmentsArray, totalMins) {
-    let basePay = 0;
-    showsTypesArray.forEach(type => {
-        basePay += (type === "ארוך") ? 840 : 670;
+    // הגדרת תאריך ברירת מחדל בטפסים להיום
+    setDefaultDates();
+
+    // טעינת נתונים ראשונית (מ-GitHub או מקומי)
+    loadData().then(() => {
+        populateClientDropdown();
+        renderAll();
     });
 
-    let totalKm = 0;
-    kmSegmentsArray.forEach(km => {
-        totalKm += (parseFloat(km) || 0);
+    // האזנה לשינוי בבורר החודשים
+    document.getElementById('month-select').addEventListener('change', (e) => {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_MONTH, e.target.value);
+        renderAll();
     });
-    const kmPay = totalKm * 0.5;
 
-    let excessMins = 0;
-    let timePay = 0;
-    if (totalMins > 120) {
-        excessMins = totalMins - 120;
-        timePay = Math.round(Math.ceil(excessMins / 60) * 70);
-    }
+    // מאזיני אירועים לטפסים ולמודאלים
+    initFormListeners();
+    initModalListeners();
+    initIchilovCalculatorLogic('main');
+    initIchilovCalculatorLogic('modal');
+});
 
-    const totalPay = basePay + kmPay + timePay;
+/* ==========================================
+   ניהול תאריכים ולשוניות
+   ========================================== */
 
-    return {
-        basePay,
-        kmPay,
-        timePay,
-        totalPay,
-        totalKm,
-        totalMins,
-        excessMins,
-        totalHoursStr: formatMinutesToHHMM(totalMins),
-        excessHoursStr: formatMinutesToHHMM(excessMins)
-    };
-}
-
-function renderIchilovDynamicFields(prefix = '') {
-    const countSelect = document.getElementById(`${prefix}ichilov-shows-count`);
-    const typesContainer = document.getElementById(`${prefix}ichilov-shows-types-container`);
-    const kmContainer = document.getElementById(`${prefix}ichilov-km-container`);
-    const extraTimesContainer = document.getElementById(`${prefix}ichilov-extra-times-container`);
-
-    if (!countSelect || !typesContainer || !kmContainer) return;
-
-    const count = parseInt(countSelect.value, 10) || 1;
-
-    if (extraTimesContainer) {
-        extraTimesContainer.style.display = count > 1 ? 'block' : 'none';
-    }
-
-    let typesHTML = '<strong>סוג מופע לכל אחד מהמופעים:</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
-    for (let i = 1; i <= count; i++) {
-        typesHTML += `
-            <div style="flex: 1; min-width: 140px;">
-                <label style="font-size: 13px;">מופע #${i}:</label>
-                <select id="${prefix}ichilov-show-type-${i}" class="form-control ichilov-dynamic-type" data-index="${i}">
-                    <option value="רגיל">רגיל (₪670)</option>
-                    <option value="ארוך">ארוך (₪840)</option>
-                </select>
-            </div>
-        `;
-    }
-    typesHTML += '</div>';
-    typesContainer.innerHTML = typesHTML;
-
-    let kmHTML = '<strong>קילומטראז\' למקטעי המסלול (בק"מ):</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
+function initMonthSelector() {
+    const monthSelect = document.getElementById('month-select');
+    const savedMonth = localStorage.getItem(STORAGE_KEYS.CURRENT_MONTH);
     
-    if (count === 1) {
-        kmHTML += `
-            <div style="flex: 1; min-width: 180px;">
-                <label style="font-size: 13px;">ק"מ הלוך (יחושב כהלוך-חזור):</label>
-                <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
-            </div>
-        `;
+    if (savedMonth) {
+        monthSelect.value = savedMonth;
     } else {
-        kmHTML += `
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 13px;">בית ➔ מופע 1:</label>
-                <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
-            </div>
-        `;
-        for (let i = 1; i < count; i++) {
-            kmHTML += `
-                <div style="flex: 1; min-width: 150px;">
-                    <label style="font-size: 13px;">מופע ${i} ➔ מופע ${i+1}:</label>
-                    <input type="number" id="${prefix}ichilov-km-${i+1}" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        monthSelect.value = `${year}-${month}`;
+        localStorage.setItem(STORAGE_KEYS.CURRENT_MONTH, monthSelect.value);
+    }
+}
+
+function setDefaultDates() {
+    const today = new Date().toISOString().split('T')[0];
+    const dateInputs = ['job-date', 'ichilov-date', 'modal-ichilov-date'];
+    dateInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = today;
+    });
+}
+
+function initTabs() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            
+            // הסרת active מכל הלשוניות והתוכן
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // הוספת active ללשונית ולתוכן הנבחרים
+            button.classList.add('active');
+            const targetContent = document.getElementById(targetTab);
+            if (targetContent) targetContent.classList.add('active');
+        });
+    });
+}
+
+/* ==========================================
+   טעינה ושמירת נתונים (מקומי / GitHub)
+   ========================================== */
+
+function getGitHubConfig() {
+    const configStr = localStorage.getItem(STORAGE_KEYS.GITHUB_CONFIG);
+    return configStr ? JSON.parse(configStr) : null;
+}
+
+async function loadData() {
+    const config = getGitHubConfig();
+    if (config && config.token && config.username && config.repo) {
+        try {
+            showStatus('טוען נתונים מ-GitHub...', 'info');
+            const data = await fetchFromGitHub(config);
+            if (data) {
+                currentData = data;
+                showStatus('הנתונים נטענו בהצלחה מ-GitHub', 'success');
+                return;
+            }
+        } catch (error) {
+            console.error('שגיאה בטעינה מ-GitHub, טוען מקומית:', error);
+            showStatus('שגיאה בחיבור ל-GitHub, טוען נתונים מקומיים', 'error');
+        }
+    }
+    
+    // טעינה מקומית כגיבוי / ברירת מחדל
+    const localData = localStorage.getItem('app_saved_data');
+    if (localData) {
+        try {
+            currentData = JSON.parse(localData);
+        } catch (e) {
+            console.error('שגיאה בפענוח נתונים מקומיים', e);
+        }
+    } else {
+        // נתוני התחלה ריקים או ברירת מחדל
+        currentData = {
+            clients: ['תלמיד פרטי', 'הרכב מוזיקלי', 'הפקה חיצונית'],
+            payments: [],
+            ichilovShows: []
+        };
+    }
+}
+
+async function saveData() {
+    // שמירה מקומית תמיד
+    localStorage.setItem('app_saved_data', JSON.stringify(currentData));
+
+    // שמירה ב-GitHub אם מוגדר
+    const config = getGitHubConfig();
+    if (config && config.token && config.username && config.repo) {
+        try {
+            showStatus('שומר שינויים ב-GitHub...', 'info');
+            await saveToGitHub(config, currentData);
+            showStatus('השינויים נשמרו בהצלחה ב-GitHub!', 'success');
+        } catch (error) {
+            console.error('שגיאה בשמירה ל-GitHub:', error);
+            showStatus('הנתונים נשמרו מקומית, אך השמירה ב-GitHub נכשלה', 'error');
+        }
+    }
+}
+
+/* ==========================================
+   אינטגרציית GitHub API (Octokit / Fetch)
+   ========================================== */
+
+const DATA_FILE_PATH = 'data.json';
+
+async function fetchFromGitHub(config) {
+    const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${DATA_FILE_PATH}`;
+    const response = await fetch(url, {
+        headers: {
+            'Authorization': `token ${config.token}`,
+            'Accept': 'application/vnd.github.v3+json'
+        }
+    });
+
+    if (response.status === 404) {
+        return null; // הקובץ עוד לא קיים
+    }
+    if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.statusText}`);
+    }
+
+    const fileData = await response.json();
+    const contentDecoded = decodeURIComponent(escape(atob(fileData.content)));
+    return {
+        parsedData: JSON.parse(contentDecoded),
+        sha: fileData.sha
+    };
+}
+
+// פונקציית עזר עוקפת לטעינה שחושפת את ה-sha
+async function fetchFromGitHubWithSha(config) {
+    const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${DATA_FILE_PATH}`;
+    const response = await fetch(url, {
+        headers: {
+            'Authorization': `token ${config.token}`,
+            'Accept': 'application/vnd.github.v3+json'
+        }
+    });
+    if (!response.ok) return { sha: null };
+    const fileData = await response.json();
+    const contentDecoded = decodeURIComponent(escape(atob(fileData.content)));
+    return {
+        data: JSON.parse(contentDecoded),
+        sha: fileData.sha
+    };
+}
+
+async function saveToGitHub(config, dataObj) {
+    // נביא קודם את ה-sha העדכני של הקובץ אם קיים
+    const existing = await fetchFromGitHubWithSha(config);
+    const sha = existing.sha;
+
+    const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${DATA_FILE_PATH}`;
+    const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(dataObj, null, 2))));
+
+    const body = {
+        message: 'Update payment and show tracking data via web app',
+        content: contentEncoded
+    };
+    if (sha) {
+        body.sha = sha;
+    }
+
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `token ${config.token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error(errJson.message || 'Failed to save to GitHub');
+    }
+}
+
+/* ==========================================
+   ניהול ממשק והודעות סטטוס
+   ========================================== */
+
+function showStatus(text, type = 'info') {
+    const statusEl = document.getElementById('status-message');
+    statusEl.textContent = text;
+    statusEl.className = `status-message ${type}`;
+    statusEl.style.display = 'block';
+    
+    setTimeout(() => {
+        statusEl.style.display = 'none';
+    }, 4000);
+}
+
+function loadGitHubConfigToUI() {
+    const config = getGitHubConfig();
+    if (config) {
+        document.getElementById('github-username').value = config.username || '';
+        document.getElementById('github-repo').value = config.repo || '';
+        document.getElementById('github-token').value = config.token || '';
+    }
+}
+
+/* ==========================================
+   לוגיקת מחשבון איכילוב (חישוב אוטומטי ותצוגה מקדימה)
+   ========================================== */
+
+function initIchilovCalculatorLogic(mode = 'main') {
+    const prefix = mode === 'modal' ? 'modal-ichilov' : 'ichilov';
+    
+    const showsCountSelect = document.getElementById(`${prefix}-shows-count`);
+    const showsTypesContainer = document.getElementById(`${prefix}-shows-types-container`);
+    const kmContainer = document.getElementById(`${prefix}-km-container`);
+    const extraTimesContainer = document.getElementById(`${prefix}-extra-times-container`);
+    
+    // שדות זמן נסיעה
+    const thereHrsInput = document.getElementById(`${prefix}-time-there-hrs`);
+    const thereMinsInput = document.getElementById(`${prefix}-time-there-mins`);
+    const backHrsInput = document.getElementById(`${prefix}-time-back-hrs`);
+    const backMinsInput = document.getElementById(`${prefix}-time-back-mins`);
+    const transHrsInput = document.getElementById(`${prefix}-time-transfers-hrs`);
+    const transMinsInput = document.getElementById(`${prefix}-time-transfers-mins`);
+
+    function updateDynamicFields() {
+        const count = parseInt(showsCountSelect.value);
+        
+        // יצירת בחירת סוג מופע לכל מופע
+        let typesHtml = '<strong style="display: block; margin-bottom: 8px;">סוגי מופעים:</strong><div class="form-row">';
+        for (let i = 1; i <= count; i++) {
+            typesHtml.innerHTML += ''; // נבנה באופן נקי למטה
+            typesHtml += `
+                <div class="form-group">
+                    <label>מופע #${i}</label>
+                    <select id="${prefix}-show-type-${i}" class="ichilov-show-type-select">
+                        <option value="standard">רגיל / סטנדרטי</option>
+                        <option value="special">מיוחד / אחר</option>
+                    </select>
                 </div>
             `;
         }
-        kmHTML += `
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 13px;">מופע ${count} ➔ הביתה:</label>
-                <input type="number" id="${prefix}ichilov-km-${count+1}" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
+        typesHtml += '</div>';
+        showsTypesContainer.innerHTML = typesHtml;
+
+        // יצירת שדות ק"מ (הלוך, חזור, מעברים) בהתאם לכמות המופעים
+        let kmHtml = '<strong style="display: block; margin-bottom: 8px;">מרחקי נסיעה (ק"מ):</strong><div class="form-row">';
+        kmHtml += `
+            <div class="form-group">
+                <label>הלוך (ק"מ)</label>
+                <input type="number" id="${prefix}-km-there" min="0" step="any" value="0" required>
+            </div>
+            <div class="form-group">
+                <label>חזור (ק"מ)</label>
+                <input type="number" id="${prefix}-km-back" min="0" step="any" value="0" required>
             </div>
         `;
-    }
-    kmHTML += '</div>';
-    kmContainer.innerHTML = kmHTML;
-
-    attachIchilovListeners(prefix);
-}
-
-function gatherIchilovInputsData(prefix = '') {
-    const countSelect = document.getElementById(`${prefix}ichilov-shows-count`);
-    const count = countSelect ? parseInt(countSelect.value, 10) || 1 : 1;
-
-    const showsTypesArray = [];
-    for (let i = 1; i <= count; i++) {
-        const typeEl = document.getElementById(`${prefix}ichilov-show-type-${i}`);
-        showsTypesArray.push(typeEl ? typeEl.value : 'רגיל');
-    }
-
-    const kmSegmentsArray = [];
-    const kmFieldsCount = (count === 1) ? 1 : (count + 1);
-    for (let i = 1; i <= kmFieldsCount; i++) {
-        const kmEl = document.getElementById(`${prefix}ichilov-km-${i}`);
-        const val = kmEl ? parseFloat(kmEl.value) || 0 : 0;
-        if (count === 1) {
-            kmSegmentsArray.push(val * 2);
-        } else {
-            kmSegmentsArray.push(val);
-        }
-    }
-
-    const timeThere = parseTimeToMinutes(document.getElementById(`${prefix}ichilov-time-there`)?.value || 0);
-    const timeBack = parseTimeToMinutes(document.getElementById(`${prefix}ichilov-time-back`)?.value || 0);
-    const timeTransfers = parseTimeToMinutes(document.getElementById(`${prefix}ichilov-time-transfers`)?.value || 0);
-    const totalMins = timeThere + timeBack + timeTransfers;
-
-    return {
-        count,
-        showsTypesArray,
-        kmSegmentsArray,
-        totalMins,
-        timeThere,
-        timeBack,
-        timeTransfers
-    };
-}
-
-function updateIchilovPreviewUnified(prefix = '') {
-    const data = gatherIchilovInputsData(prefix);
-    const calc = calculateIchilovAdvanced(data.showsTypesArray, data.kmSegmentsArray, data.totalMins);
-
-    const previewEl = document.getElementById(prefix ? 'modal-calc-breakdown' : 'calc-breakdown');
-    if (previewEl) {
-        previewEl.innerHTML = `שכר בסיס (${data.count} מופעים): ₪${calc.basePay} | נסיעות: ₪${calc.kmPay} (${calc.totalKm} ק"מ) | תוספת זמן: ₪${calc.timePay} (${calc.totalHoursStr}) | <strong>סה"כ: ₪${calc.totalPay}</strong>`;
-    }
-}
-
-function attachIchilovListeners(prefix = '') {
-    const countSelect = document.getElementById(`${prefix}ichilov-shows-count`);
-    if (countSelect && !countSelect.dataset.listenerAttached) {
-        countSelect.dataset.listenerAttached = 'true';
-        countSelect.addEventListener('change', () => {
-            renderIchilovDynamicFields(prefix);
-            updateIchilovPreviewUnified(prefix);
-        });
-    }
-
-    const container = document.getElementById(prefix ? 'ichilov-modal' : 'ichilov-form');
-    if (container) {
-        container.querySelectorAll('input, select').forEach(el => {
-            if (!el.dataset.listenerAttached) {
-                el.dataset.listenerAttached = 'true';
-                el.addEventListener('input', () => updateIchilovPreviewUnified(prefix));
-                el.addEventListener('change', () => updateIchilovPreviewUnified(prefix));
-            }
-        });
-    }
-}
-
-// ==========================================
-// 4. טעינה ורינדור הנתונים (Dashboard)
-// ==========================================
-async function loadData() {
-    try {
-        const response = await fetch('data.json?t=' + Date.now());
-        if (!response.ok) throw new Error("שגיאה בטעינת data.json");
-        currentData = await response.json();
-        
-        const monthPicker = document.getElementById('month-select');
-        if (monthPicker) {
-            if (!selectedMonth) {
-                const availableMonths = Object.keys(currentData);
-                if (availableMonths.length > 0) {
-                    selectedMonth = availableMonths[0];
-                } else {
-                    const now = new Date();
-                    selectedMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                }
-            }
-            monthPicker.value = selectedMonth;
-        }
-        
-        renderDashboard();
-    } catch (err) {
-        console.error("שגיאה בטעינת הנתונים:", err);
-        showStatusMessage("שגיאה בטעינת קובץ הנתונים", true);
-    }
-}
-
-function updateClientsDropdown() {
-    const selectEl = document.getElementById('client-select');
-    if (!selectEl) return;
-
-    const previousValue = selectEl.value;
-
-    const clientsSet = new Set();
-    Object.values(currentData).forEach(monthEvents => {
-        if (Array.isArray(monthEvents)) {
-            monthEvents.forEach(item => {
-                if (item.client && item.client.trim()) {
-                    clientsSet.add(item.client.trim());
-                }
-            });
-        }
-    });
-
-    selectEl.innerHTML = '<option value="" disabled selected>בחר לקוח...</option>';
-
-    Array.from(clientsSet).sort().forEach(clientName => {
-        const option = document.createElement('option');
-        option.value = clientName;
-        option.textContent = clientName;
-        selectEl.appendChild(option);
-    });
-
-    const newOpt = document.createElement('option');
-    newOpt.value = "__NEW__";
-    newOpt.textContent = "➕ לקוח חדש...";
-    selectEl.appendChild(newOpt);
-
-    if (previousValue && Array.from(selectEl.options).some(o => o.value === previousValue)) {
-        selectEl.value = previousValue;
-    }
-}
-
-function renderDashboard() {
-    const events = currentData[selectedMonth] || [];
-    
-    let totalAll = 0;
-    let totalPaid = 0;
-    let totalUnpaid = 0;
-
-    const mainList = document.getElementById('payments-list');
-    const ichilovList = document.getElementById('ichilov-list');
-
-    if (mainList) mainList.innerHTML = '';
-    if (ichilovList) ichilovList.innerHTML = '';
-
-    events.forEach(item => {
-        try {
-            const itemAmount = Number(item.amount) || 0;
-            totalAll += itemAmount;
-            if (item.isPaid) {
-                totalPaid += itemAmount;
-            } else {
-                totalUnpaid += itemAmount;
-            }
-
-            const statusSelectHTML = `
-                <select onchange="window.handleStatusChange(${item.id}, this.value)" 
-                        style="padding: 4px 8px; border-radius: 8px; border: 1px solid #ccc; font-weight: bold; cursor: pointer; background-color: ${item.isPaid ? '#d4edda' : '#f8d7da'}; color: ${item.isPaid ? '#155724' : '#721c24'};">
-                    <option value="false" ${!item.isPaid ? 'selected' : ''}>✗ טרם שולם</option>
-                    <option value="true" ${item.isPaid ? 'selected' : ''}>✓ שולם</option>
-                </select>
+        if (count > 1) {
+            kmHtml += `
+                <div class="form-group">
+                    <label>מעברים בין מופעים (ק"מ)</label>
+                    <input type="number" id="${prefix}-km-transfers" min="0" step="any" value="0">
+                </div>
             `;
-
-            if (mainList) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${item.date || ''}</td>
-                    <td>${item.client || ''}</td>
-                    <td>${item.type || ''}</td>
-                    <td>${item.location || ''}</td>
-                    <td>₪${itemAmount.toLocaleString()}</td>
-                    <td>${statusSelectHTML}</td>
-                    <td>
-                        <button class="btn-delete" onclick="window.deleteEvent(${item.id})">🗑️</button>
-                    </td>
-                `;
-                mainList.appendChild(tr);
-            }
-
-            if (item.isIchilov && ichilovList) {
-                const iData = item.ichilovData || {};
-                const calc = iData.calcDetails || calculateIchilovAdvanced(iData.showsTypesArray || ['רגיל'], iData.kmSegmentsArray || [0], iData.totalMins || 0);
-
-                const trI = document.createElement('tr');
-                trI.innerHTML = `
-                    <td>${item.date || ''}</td>
-                    <td>${iData.location || item.location || ''}</td>
-                    <td>${iData.showsTypesSummary || item.type || ''}</td>
-                    <td>${calc.totalKm || 0} ק"מ</td>
-                    <td>${calc.totalHoursStr || '0:00'}</td>
-                    <td>₪${calc.basePay || 0}</td>
-                    <td>₪${calc.kmPay || 0}</td>
-                    <td>₪${calc.timePay || 0}</td>
-                    <td><strong>₪${itemAmount.toLocaleString()}</strong></td>
-                    <td>${statusSelectHTML}</td>
-                    <td>
-                        <button class="btn-delete" onclick="window.deleteEvent(${item.id})">🗑️</button>
-                    </td>
-                `;
-                ichilovList.appendChild(trI);
-            }
-
-        } catch (itemErr) {
-            console.error("שגיאה ברינדור שורת אירוע:", item, itemErr);
+            extraTimesContainer.style.display = 'flex';
+        } else {
+            extraTimesContainer.style.display = 'none';
         }
-    });
+        kmHtml += '</div>';
+        kmContainer.innerHTML = kmHtml;
 
-    const elTotal = document.getElementById('total-amount');
-    const elPaid = document.getElementById('paid-amount');
-    const elUnpaid = document.getElementById('unpaid-amount');
-
-    if (elTotal) elTotal.textContent = `₪${totalAll.toLocaleString()}`;
-    if (elPaid) elPaid.textContent = `₪${totalPaid.toLocaleString()}`;
-    if (elUnpaid) elUnpaid.textContent = `₪${totalUnpaid.toLocaleString()}`;
-
-    updateClientsDropdown();
-    renderSaveButton();
-    renderGlobalUnpaidTable(); // עדכון אוטומטי לטבלת חובות פתוחים
-}
-
-// ==========================================
-// 5. ניהול טבלת חובות פתוחים גלובלית ומעבר חודש מהיר
-// ==========================================
-function renderGlobalUnpaidTable() {
-    const unpaidListEl = document.getElementById('global-unpaid-list');
-    const totalUnpaidSummaryEl = document.getElementById('total-unpaid-summary');
-    if (!unpaidListEl) return;
-
-    unpaidListEl.innerHTML = '';
-    let grandTotalUnpaid = 0;
-    let hasItems = false;
-
-    Object.keys(currentData).sort().forEach(monthKey => {
-        const events = currentData[monthKey];
-        if (!Array.isArray(events)) return;
-
-        events.forEach(item => {
-            if (!item.isPaid) {
-                hasItems = true;
-                const itemAmount = Number(item.amount) || 0;
-                grandTotalUnpaid += itemAmount;
-
-                const tr = document.createElement('tr');
-                
-                let displayType = item.type || '';
-                let displayLocation = item.location || '';
-                if (item.isIchilov && item.ichilovData) {
-                    displayType = item.ichilovData.showsTypesSummary || item.type;
-                    displayLocation = item.ichilovData.location || item.location;
-                }
-
-                tr.innerHTML = `
-                    <td><strong>${monthKey}</strong></td>
-                    <td>${item.date || ''}</td>
-                    <td>${item.client || ''}</td>
-                    <td>${displayType}</td>
-                    <td>${displayLocation}</td>
-                    <td><strong>₪${itemAmount.toLocaleString()}</strong></td>
-                    <td>
-                        <button class="status-btn unpaid" onclick="window.jumpToMonthAndEvent('${monthKey}')" style="cursor: pointer;">
-                            🔍 צפה בחודש
-                        </button>
-                    </td>
-                `;
-                unpaidListEl.appendChild(tr);
-            }
-        });
-    });
-
-    if (!hasItems) {
-        unpaidListEl.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--success-color); font-weight: bold; padding: 20px;">אין תשלומים ממתינים לגבייה! הכל שולם 🌟</td></tr>`;
+        // הוספת האזנות לשינויים לחישוב מחדש
+        attachCalculationListeners(prefix);
+        calculateIchilovPreview(prefix);
     }
 
-    if (totalUnpaidSummaryEl) {
-        totalUnpaidSummaryEl.textContent = `סך הכל ממתין לגבייה בכל החודשים: ₪${grandTotalUnpaid.toLocaleString()}`;
-    }
-}
-
-window.jumpToMonthAndEvent = function(monthKey) {
-    selectedMonth = monthKey;
+    showsCountSelect.addEventListener('change', updateDynamicFields);
     
-    const monthPicker = document.getElementById('month-select');
-    if (monthPicker) {
-        monthPicker.value = monthKey;
-    }
+    // הרצה ראשונית לבניית השדות
+    updateDynamicFields();
+}
 
-    // מעבר לטאב ניהול עבודה רגילה כדי לראות את נתוני החודש הנבחר
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+function attachCalculationListeners(prefix) {
+    const container = document.getElementById(prefix === 'modal' ? 'ichilov-modal' : 'add-ichilov-form');
+    // האזנה לכל שינוי בתוך הטופס הרלוונטי לצורך עדכון תצוגה מקדימה
+    const inputs = container.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        // הסרת מאזין קודם למניעת כפילויות והוספת חדש
+        input.removeEventListener('input', handleInputEvent);
+        input.addEventListener('input', handleInputEvent);
+        input.removeEventListener('change', handleInputEvent);
+        input.addEventListener('change', handleInputEvent);
+    });
 
-    const regularTabBtn = document.querySelector('[data-tab="regular-form"]');
-    const regularTabContent = document.getElementById('regular-form');
-    if (regularTabBtn) regularTabBtn.classList.add('active');
-    if (regularTabContent) regularTabContent.classList.add('active');
-
-    renderDashboard();
-    showStatusMessage(`עברת לתצוגת חודש ${monthKey}`);
-};
-
-function renderSaveButton() {
-    let saveBtnContainer = document.getElementById('save-changes-container');
-    if (!saveBtnContainer) {
-        saveBtnContainer = document.createElement('div');
-        saveBtnContainer.id = 'save-changes-container';
-        saveBtnContainer.style.cssText = 'text-align: center; margin: 20px 0;';
-        
-        const mainCard = document.querySelector('.card') || document.body;
-        mainCard.appendChild(saveBtnContainer);
-    }
-
-    if (hasUnsavedChanges) {
-        saveBtnContainer.innerHTML = `
-            <button onclick="window.saveAllChanges()" 
-                    style="background-color: #28a745; color: white; padding: 12px 28px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                💾 שמור שינויים
-            </button>
-        `;
-    } else {
-        saveBtnContainer.innerHTML = '';
+    function handleInputEvent() {
+        calculateIchilovPreview(prefix);
     }
 }
 
-// ==========================================
-// 6. שינוי סטטוס תשלום + שמירה ל-GitHub
-// ==========================================
-window.handleStatusChange = function(id, value) {
-    const monthEvents = currentData[selectedMonth] || [];
-    const targetEvent = monthEvents.find(item => item.id === id);
+function calculateIchilovPreview(prefix) {
+    const result = computeIchilovValues(prefix);
+    const breakdownEl = document.getElementById(prefix === 'modal' ? 'modal-calc-breakdown' : 'calc-breakdown');
+    
+    if (!breakdownEl) return;
 
-    if (!targetEvent) return;
-
-    const newStatus = (value === 'true');
-
-    if (targetEvent.isIchilov || targetEvent.client === 'החברה מאיכילוב') {
-        monthEvents.forEach(item => {
-            if (item.isIchilov || item.client === 'החברה מאיכילוב') {
-                item.isPaid = newStatus;
-            }
-        });
-    } else {
-        targetEvent.isPaid = newStatus;
-    }
-
-    hasUnsavedChanges = true;
-    renderDashboard();
-    showStatusMessage('ישנם שינויים שלא נשמרו. לחץ על "שמור שינויים"');
-};
-
-window.saveAllChanges = async function() {
-    const config = getGithubConfig();
-
-    if (!config.username || !config.repo || !config.token) {
-        localStorage.setItem('local_data_backup', JSON.stringify(currentData));
-        hasUnsavedChanges = false;
-        renderDashboard();
-        showStatusMessage('השינויים נשמרו מקומית בדפדפן (חסרים פרטי חיבור בהגדרות GitHub)', true);
+    if (result.error) {
+        breakdownEl.textContent = result.error;
         return;
     }
 
-    showStatusMessage('שומר שינויים ב-GitHub...');
-    try {
-        const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/data.json`;
-        const headers = { 
-            'Authorization': `Bearer ${config.token}`,
-            'Accept': 'application/vnd.github.v3+json'
-        };
-        
-        let sha = null;
-        const getRes = await fetch(url, { headers });
-        
-        if (getRes.ok) {
-            const getData = await getRes.json();
-            sha = getData.sha;
-        } else if (getRes.status !== 404) {
-            const errData = await getRes.json().catch(() => ({}));
-            throw new Error(errData.message || `שגיאת גישה (${getRes.status})`);
-        }
+    breakdownEl.innerHTML = `
+        מרחק כולל: <strong>${result.totalKm.toFixed(1)} ק"מ</strong> (${result.formattedKm}) | 
+        זמן כולל: <strong>${result.totalTimeFormatted}</strong> (${result.billedHours.toFixed(1)} שש"ז) | 
+        שכר בסיס: ₪${result.basePay} | 
+        נסיעות (ק"מ+זמן): ₪${result.travelPay.toFixed(0)} | 
+        <strong>סה"כ לתשלום: ₪${result.totalPay.toFixed(0)}</strong>
+    `;
+}
 
-        const jsonString = JSON.stringify(currentData, null, 2);
-        const utf8Bytes = new TextEncoder().encode(jsonString);
-        let binaryString = "";
-        for (let i = 0; i < utf8Bytes.length; i++) {
-            binaryString += String.fromCharCode(utf8Bytes[i]);
-        }
-        const contentEncoded = btoa(binaryString);
-        
-        const payload = {
-            message: 'עדכון נתונים מאפליקציית התשלומים',
-            content: contentEncoded
-        };
-        if (sha) payload.sha = sha;
+function computeIchilovValues(prefix) {
+    const showsCount = parseInt(document.getElementById(`${prefix}-shows-count`).value);
+    
+    // קריאת מרחקים
+    const kmThere = parseFloat(document.getElementById(`${prefix}-km-there`)?.value) || 0;
+    const kmBack = parseFloat(document.getElementById(`${prefix}-km-back`)?.value) || 0;
+    const kmTransfers = showsCount > 1 ? (parseFloat(document.getElementById(`${prefix}-km-transfers`)?.value) || 0) : 0;
+    
+    const totalKm = kmThere + kmBack + kmTransfers;
 
-        const putRes = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                ...headers,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (putRes.ok) {
-            hasUnsavedChanges = false;
-            renderDashboard();
-            showStatusMessage('השינויים נשמרו בהצלחה ב-GitHub!');
-        } else {
-            const putErr = await putRes.json().catch(() => ({}));
-            throw new Error(putErr.message || 'שגיאה בשמירה ל-GitHub');
-        }
-    } catch (err) {
-        console.error(err);
-        showStatusMessage(`שגיאה בשמירה ל-GitHub: ${err.message}`, true);
+    // קריאת זמנים (הפרדה לשעות ודקות)
+    const thereHrs = parseInt(document.getElementById(`${prefix}-time-there-hrs`).value) || 0;
+    const thereMins = parseInt(document.getElementById(`${prefix}-time-there-mins`).value) || 0;
+    const backHrs = parseInt(document.getElementById(`${prefix}-time-back-hrs`).value) || 0;
+    const backMins = parseInt(document.getElementById(`${prefix}-time-back-mins`).value) || 0;
+    
+    let transHrs = 0;
+    let transMins = 0;
+    if (showsCount > 1) {
+        transHrs = parseInt(document.getElementById(`${prefix}-time-transfers-hrs`)?.value) || 0;
+        transMins = parseInt(document.getElementById(`${prefix}-time-transfers-mins`)?.value) || 0;
     }
-};
 
-window.deleteEvent = function(id) {
-    if (!confirm("האם אתה בטוח שברצונך למחוק אירוע זה?")) return;
-    if (currentData[selectedMonth]) {
-        currentData[selectedMonth] = currentData[selectedMonth].filter(item => item.id !== id);
-        hasUnsavedChanges = true;
-        renderDashboard();
-        showStatusMessage('האירוע נמחק. זכור ללחוץ על "שמור שינויים"');
+    const totalMinutes = (thereHrs * 60 + thereMins) + (backHrs * 60 + backMins) + (transHrs * 60 + transMins);
+    const totalHoursDecimal = totalMinutes / 60;
+    
+    const totalTimeFormatted = `${Math.floor(totalMinutes / 60)} שעות ו-${totalMinutes % 60} דקות`;
+
+    // חישוב שכר מופעים
+    let basePay = ICHILOV_CONFIG.baseRate;
+    let showsBreakdownText = `מופע 1: ₪${ICHILOV_CONFIG.baseRate}`;
+    
+    for (let i = 2; i <= showsCount; i++) {
+        basePay += ICHILOV_CONFIG.extraShowRate;
+        showsBreakdownText += `, מופע ${i}: ₪${ICHILOV_CONFIG.extraShowRate}`;
     }
-};
 
-// ==========================================
-// 7. ניהול חלון הגדרות GitHub (Modal)
-// ==========================================
-function setupModal() {
-    const modal = document.getElementById('settings-modal');
-    const btn = document.getElementById('settings-btn');
-    const closeBtn = document.querySelector('.close-btn');
-    const form = document.getElementById('settings-form');
+    // חישוב נסיעות וזמן
+    const kmPay = totalKm * ICHILOV_CONFIG.kmRate;
+    // שעות מזוכות: מינימום שעות נסיעה (למשל 1.5) או הזמן בפועל הגבוה מביניהם
+    const billedHours = Math.max(totalHoursDecimal, ICHILOV_CONFIG.minTravelHours);
+    const timePay = billedHours * ICHILOV_CONFIG.hourlyRate;
+    const travelPay = kmPay + timePay;
 
-    const getInputElement = (...ids) => {
-        for (let id of ids) {
-            const el = document.getElementById(id);
-            if (el) return el;
-        }
-        return null;
+    const totalPay = basePay + travelPay;
+
+    // בניית מחרוזת פירוט מופעים לתצוגה בטבלה
+    let showsTypesSummary = [];
+    for (let i = 1; i <= showsCount; i++) {
+        const typeVal = document.getElementById(`${prefix}-show-type-${i}`)?.value || 'standard';
+        showsTypesSummary.push(`מופע ${i} (${typeVal === 'standard' ? 'רגיל' : 'מיוחד'})`);
+    }
+
+    return {
+        showsCount,
+        showsTypesSummaryText: showsTypesSummary.join(', '),
+        totalKm,
+        formattedKm: showsCount > 1 ? `הלוך: ${kmThere}, חזור: ${kmBack}, מעברים: ${kmTransfers}` : `הלוך: ${kmThere}, חזור: ${kmBack}`,
+        totalTimeFormatted,
+        billedHours,
+        basePay,
+        travelPay,
+        totalPay,
+        status: document.getElementById(prefix === 'modal' ? 'modal-ichilov-status' : 'ichilov-status').value === 'true'
     };
+}
 
-    if (btn && modal) {
-        btn.onclick = () => {
-            const config = getGithubConfig();
-            
-            const userInput = getInputElement('github-username', 'username', 'gh-username');
-            const repoInput = getInputElement('github-repo', 'repo', 'gh-repo');
-            const tokenInput = getInputElement('github-token', 'token', 'gh-token', 'pat');
+/* ==========================================
+   ניהול טפסים ומאזינים
+   ========================================== */
 
-            if (userInput) userInput.value = config.username;
-            if (repoInput) repoInput.value = config.repo;
-            if (tokenInput) tokenInput.value = config.token;
+function populateClientDropdown() {
+    const select = document.getElementById('client-select');
+    if (!select) return;
 
-            modal.style.display = 'block';
-        };
-    }
+    let html = '';
+    currentData.clients.forEach(client => {
+        html += `<option value="${client}">${client}</option>`;
+    });
+    html += `<option value="ADD_NEW">➕ הוסף לקוח חדש...</option>`;
+    select.innerHTML = html;
 
-    if (closeBtn && modal) {
-        closeBtn.onclick = () => { modal.style.display = 'none'; };
-    }
+    select.removeEventListener('change', handleClientSelectChange);
+    select.addEventListener('change', handleClientSelectChange);
+}
 
-    window.onclick = (event) => {
-        if (event.target === modal) modal.style.display = 'none';
-    };
-
-    if (form) {
-        form.onsubmit = (e) => {
-            e.preventDefault();
-
-            const userInput = getInputElement('github-username', 'username', 'gh-username');
-            const repoInput = getInputElement('github-repo', 'repo', 'gh-repo');
-            const tokenInput = getInputElement('github-token', 'token', 'gh-token', 'pat');
-
-            const username = userInput ? userInput.value.trim() : '';
-            const repo = repoInput ? repoInput.value.trim() : '';
-            const token = tokenInput ? tokenInput.value.trim() : '';
-
-            localStorage.setItem('gh_username', username);
-            localStorage.setItem('gh_repo', repo);
-            localStorage.setItem('gh_token', token);
-
-            showStatusMessage('הגדרות GitHub נשמרו בהצלחה!');
-            if (modal) modal.style.display = 'none';
-        };
+function handleClientSelectChange(e) {
+    const newClientContainer = document.getElementById('new-client-container');
+    if (e.target.value === 'ADD_NEW') {
+        newClientContainer.style.display = 'block';
+        document.getElementById('new-client-name').required = true;
+    } else {
+        newClientContainer.style.display = 'none';
+        document.getElementById('new-client-name').required = false;
     }
 }
 
-// ==========================================
-// 8. ניהול לשוניות (Tabs)
-// ==========================================
-function setupTabs() {
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+function initFormListeners() {
+    // טופס עבודה רגילה
+    document.getElementById('add-regular-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const clientSelect = document.getElementById('client-select');
+        let clientName = clientSelect.value;
+        
+        if (clientName === 'ADD_NEW') {
+            const newNameInput = document.getElementById('new-client-name');
+            clientName = newNameInput.value.trim();
+            if (newNameInput && !currentData.clients.includes(clientName)) {
+                currentData.clients.push(clientName);
+            }
+        }
 
-            btn.classList.add('active');
-            const tabId = btn.getAttribute('data-tab');
-            const targetTab = document.getElementById(tabId);
-            if (targetTab) targetTab.classList.add('active');
+        const newPayment = {
+            id: 'pay_' + Date.now(),
+            date: document.getElementById('job-date').value,
+            client: clientName,
+            jobType: document.getElementById('job-type').value,
+            location: document.getElementById('job-location').value,
+            amount: parseFloat(document.getElementById('job-amount').value) || 0,
+            paid: document.getElementById('job-status').value === 'true',
+            isIchilov: false
+        };
+
+        currentData.payments.push(newPayment);
+        await saveData();
+        
+        populateClientDropdown();
+        document.getElementById('add-regular-form').reset();
+        setDefaultDates();
+        document.getElementById('new-client-container').style.display = 'none';
+        renderAll();
+        showStatus('האירוע נוסף בהצלחה!', 'success');
+    });
+
+    // טופס איכילוב הראשי
+    document.getElementById('add-ichilov-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const computed = computeIchilovValues('main');
+        const locationVal = document.getElementById('ichilov-location').value;
+        const dateVal = document.getElementById('ichilov-date').value;
+
+        const ichilovRecord = {
+            id: 'ichilov_' + Date.now(),
+            date: dateVal,
+            location: locationVal,
+            ...computed
+        };
+
+        // הוספה גם לטבלת מופעי איכילוב וגם כשורת תשלום כללית
+        currentData.ichilovShows.push(ichilovRecord);
+        
+        currentData.payments.push({
+            id: 'pay_ichilov_' + Date.now(),
+            date: dateVal,
+            client: 'איכילוב (' + locationVal + ')',
+            jobType: `מופעי איכילוב (${computed.showsCount})`,
+            location: locationVal,
+            amount: computed.totalPay,
+            paid: computed.status,
+            isIchilov: true,
+            refId: ichilovRecord.id
         });
+
+        await saveData();
+        document.getElementById('add-ichilov-form').reset();
+        setDefaultDates();
+        initIchilovCalculatorLogic('main');
+        renderAll();
+        showStatus('מופע איכילוב נוסף בהצלחה!', 'success');
+    });
+
+    // טופס איכילוב במודאל
+    document.getElementById('modal-ichilov-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const computed = computeIchilovValues('modal');
+        const locationVal = document.getElementById('modal-ichilov-location').value;
+        const dateVal = document.getElementById('modal-ichilov-date').value;
+
+        const ichilovRecord = {
+            id: 'ichilov_' + Date.now(),
+            date: dateVal,
+            location: locationVal,
+            ...computed
+        };
+
+        currentData.ichilovShows.push(ichilovRecord);
+        currentData.payments.push({
+            id: 'pay_ichilov_' + Date.now(),
+            date: dateVal,
+            client: 'איכילוב (' + locationVal + ')',
+            jobType: `מופעי איכילוב (${computed.showsCount})`,
+            location: locationVal,
+            amount: computed.totalPay,
+            paid: computed.status,
+            isIchilov: true,
+            refId: ichilovRecord.id
+        });
+
+        await saveData();
+        closeIchilovModal();
+        renderAll();
+        showStatus('מופע איכילוב נוסף בהצלחה!', 'success');
+    });
+
+    // הגדרות GitHub
+    document.getElementById('settings-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const config = {
+            username: document.getElementById('github-username').value.trim(),
+            repo: document.getElementById('github-repo').value.trim(),
+            token: document.getElementById('github-token').value.trim()
+        };
+        localStorage.setItem(STORAGE_KEYS.GITHUB_CONFIG, JSON.stringify(config));
+        closeSettingsModal();
+        showStatus('הגדרות GitHub נשמרו בהצלחה! מנסה לסנכרן...', 'success');
+        loadData().then(() => renderAll());
     });
 }
 
-// ==========================================
-// 9. ניהול מודאל איכילוב מהטופס הראשי
-// ==========================================
-function setupIchilovModal() {
-    const modal = document.getElementById('ichilov-modal');
-    const closeBtn = document.getElementById('close-ichilov-modal');
-    const form = document.getElementById('modal-ichilov-form');
+/* ==========================================
+   ניהול חלוניות מודאל (Settings & Ichilov Modal)
+   ========================================== */
 
-    if (closeBtn && modal) {
-        closeBtn.onclick = () => { modal.style.display = 'none'; };
+function initModalListeners() {
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsBtn = document.getElementById('settings-btn');
+    const closeSettings = settingsModal.querySelector('.close-btn');
+
+    settingsBtn.addEventListener('click', () => settingsModal.style.display = 'block');
+    closeSettings.addEventListener('click', () => settingsModal.style.display = 'none');
+
+    // מודאל איכילוב (ניתן לפתוח דרך כפתור או פעולת עזר בעתיד)
+    const ichilovModal = document.getElementById('ichilov-modal');
+    const closeIchilov = document.getElementById('close-ichilov-modal');
+    closeIchilov.addEventListener('click', closeIchilovModal);
+
+    window.addEventListener('click', (e) => {
+        if (e.target === settingsModal) settingsModal.style.display = 'none';
+        if (e.target === ichilovModal) closeIchilovModal();
+    });
+}
+
+function closeSettingsModal() {
+    document.getElementById('settings-modal').style.display = 'none';
+}
+
+function closeIchilovModal() {
+    document.getElementById('ichilov-modal').style.display = 'none';
+}
+
+/* ==========================================
+   רינדור ותצוגת נתונים בטבלאות ובסיכומים
+   ========================================== */
+
+function renderAll() {
+    const selectedMonth = document.getElementById('month-select').value; // פורמט YYYY-MM
+    
+    // סינון תשלומים לפי חודש נבחר
+    const filteredPayments = currentData.payments.filter(p => p.date && p.date.startsWith(selectedMonth));
+    const filteredIchilov = currentData.ichilovShows.filter(i => i.date && i.date.startsWith(selectedMonth));
+
+    renderSummary(filteredPayments);
+    renderPaymentsTable(filteredPayments);
+    renderIchilovTable(filteredIchilov);
+    renderGlobalUnpaidTable(); // מציג חובות פתוחים מכל החודשים בלשונית הייעודית
+}
+
+function renderSummary(payments) {
+    let total = 0;
+    let paid = 0;
+    let unpaid = 0;
+
+    payments.forEach(p => {
+        const amt = parseFloat(p.amount) || 0;
+        total += amt;
+        if (p.paid) {
+            paid += amt;
+        } else {
+            unpaid += amt;
+        }
+    });
+
+    document.getElementById('total-amount').textContent = `₪${total.toFixed(0)}`;
+    document.getElementById('paid-amount').textContent = `₪${paid.toFixed(0)}`;
+    document.getElementById('unpaid-amount').textContent = `₪${unpaid.toFixed(0)}`;
+}
+
+function renderPaymentsTable(payments) {
+    const tbody = document.getElementById('payments-list');
+    if (!tbody) return;
+
+    if (payments.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #777;">אין אירועים רשומים בחודש זה</td></tr>`;
+        return;
     }
 
-    renderIchilovDynamicFields('modal-');
+    // מיון לפי תאריך
+    payments.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    if (form) {
-        form.onsubmit = (e) => {
-            e.preventDefault();
-            const date = document.getElementById('modal-ichilov-date').value;
-            const location = document.getElementById('modal-ichilov-location').value;
-            const isPaid = document.getElementById('modal-ichilov-status').value === 'true';
+    let html = '';
+    payments.forEach(p => {
+        html += `
+            <tr>
+                <td>${p.date}</td>
+                <td><strong>${escapeHtml(p.client)}</strong></td>
+                <td>${escapeHtml(p.jobType)}</td>
+                <td>${escapeHtml(p.location || '-')}</td>
+                <td>₪${parseFloat(p.amount).toFixed(0)}</td>
+                <td>
+                    <span class="badge ${p.paid ? 'badge-success' : 'badge-warning'}" style="cursor: pointer;" onclick="togglePaymentStatus('${p.id}')">
+                        ${p.paid ? '✓ שולם' : '✗ טרם שולם'}
+                    </span>
+                </td>
+                <td>
+                    <button class="action-btn delete-btn" onclick="deletePayment('${p.id}')" title="מחק אירוע">🗑️</button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+}
 
-            const inputData = gatherIchilovInputsData('modal-');
-            const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.totalMins);
-            const monthKey = date.substring(0, 7);
+function renderIchilovTable(ichilovShows) {
+    const tbody = document.getElementById('ichilov-list');
+    if (!tbody) return;
 
-            const showsTypesSummary = inputData.showsTypesArray.map((t, idx) => `מופע ${idx+1} (${t})`).join(', ');
+    if (ichilovShows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: #777;">אין מופעי איכילוב רשומים בחודש זה</td></tr>`;
+        return;
+    }
 
-            const newEvent = {
-                id: Date.now(),
-                date,
-                client: 'החברה מאיכילוב',
-                type: `${inputData.count} מופעים`,
-                location,
-                amount: calc.totalPay,
-                isPaid,
-                isIchilov: true,
-                ichilovData: {
-                    showsCount: inputData.count,
-                    showsTypesArray: inputData.showsTypesArray,
-                    showsTypesSummary,
-                    kmSegmentsArray: inputData.kmSegmentsArray,
-                    timeThere: inputData.timeThere,
-                    timeBack: inputData.timeBack,
-                    timeTransfers: inputData.timeTransfers,
-                    totalMins: inputData.totalMins,
-                    location,
-                    calcDetails: calc
-                }
-            };
+    ichilovShows.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-            if (!currentData[monthKey]) currentData[monthKey] = [];
-            currentData[monthKey].push(newEvent);
+    let html = '';
+    ichilovShows.forEach(item => {
+        html += `
+            <tr>
+                <td>${item.date}</td>
+                <td><strong>${escapeHtml(item.location)}</strong></td>
+                <td>${escapeHtml(item.showsTypesSummaryText)}</td>
+                <td>${item.totalKm.toFixed(1)} ק"מ</td>
+                <td>${item.totalTimeFormatted}</td>
+                <td>₪${item.basePay}</td>
+                <td>₪${item.travelPay.toFixed(0)}</td>
+                <td>כלול</td>
+                <td><strong>₪${item.totalPay.toFixed(0)}</strong></td>
+                <td>
+                    <span class="badge ${item.status ? 'badge-success' : 'badge-warning'}" style="cursor: pointer;" onclick="toggleIchilovStatus('${item.id}')">
+                        ${item.status ? '✓ שולם' : '✗ טרם שולם'}
+                    </span>
+                </td>
+                <td>
+                    <button class="action-btn delete-btn" onclick="deleteIchilovRecord('${item.id}')" title="מחק מופע איכילוב">🗑️</button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+}
 
-            hasUnsavedChanges = true;
-            renderDashboard();
-            form.reset();
-            renderIchilovDynamicFields('modal-');
-            if (modal) modal.style.display = 'none';
-            showStatusMessage('מופע איכילוב נוסף בהצלחה! לחץ "שמור שינויים".');
-        };
+function renderGlobalUnpaidTable() {
+    const tbody = document.getElementById('global-unpaid-list');
+    const summaryEl = document.getElementById('total-unpaid-summary');
+    if (!tbody) return;
+
+    // איסוף כל התשלומים שלא שולמו מכל החודשים
+    const unpaidPayments = currentData.payments.filter(p => !p.paid);
+    
+    // מיון לפי תאריך מהישן לחדש
+    unpaidPayments.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let totalUnpaidSum = 0;
+    unpaidPayments.forEach(p => { totalUnpaidSum += (parseFloat(p.amount) || 0); });
+    
+    if (summaryEl) {
+        summaryEl.textContent = `סך הכל ממתין לגבייה מכל החודשים: ₪${totalUnpaidSum.toFixed(0)}`;
+    }
+
+    if (unpaidPayments.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #777;">אין חובות פתוחים ממתינים לגבייה! כל הכבוד 🎉</td></tr>`;
+        return;
+    }
+
+    let html = '';
+    unpaidPayments.forEach(p => {
+        const monthStr = p.date ? p.date.substring(0, 7) : '-';
+        html += `
+            <tr>
+                <td><span class="badge" style="background:#eef2f7; color:#333;">${monthStr}</span></td>
+                <td>${p.date}</td>
+                <td><strong>${escapeHtml(p.client)}</strong></td>
+                <td>${escapeHtml(p.jobType)}</td>
+                <td>${escapeHtml(p.location || '-')}</td>
+                <td><strong style="color: var(--danger-color);">₪${parseFloat(p.amount).toFixed(0)}</strong></td>
+                <td>
+                    <button class="submit-btn" style="padding: 4px 10px; font-size: 0.85rem;" onclick="markAsPaidAndRefresh('${p.id}')">סמן ששולם ✓</button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+}
+
+/* ==========================================
+   פעולות עדכון ומחיקה גלובליות
+   ========================================== */
+
+async function togglePaymentStatus(id) {
+    const payment = currentData.payments.find(p => p.id === id);
+    if (payment) {
+        payment.paid = !payment.paid;
+        
+        // אם מדובר באיכילוב, נעדכן גם את הרשומת איכילוב המקושרת
+        if (payment.refId) {
+            const ichilov = currentData.ichilovShows.find(i => i.id === payment.refId);
+            if (ichilov) ichilov.status = payment.paid;
+        }
+
+        await saveData();
+        renderAll();
+        showStatus('סטטוס תשלום עודכן', 'success');
     }
 }
 
-// ==========================================
-// 10. הוספת אירועים (כולל האזנה לבחירת איכילוב בטופס הראשי)
-// ==========================================
-function setupForms() {
-    const clientSelect = document.getElementById('client-select');
-    const newClientContainer = document.getElementById('new-client-container');
+async function toggleIchilovStatus(id) {
+    const ichilov = currentData.ichilovShows.find(i => i.id === id);
+    if (ichilov) {
+        ichilov.status = !ichilov.status;
+        
+        // עדכון התשלום המקושר בטבלה הכללית
+        const payment = currentData.payments.find(p => p.refId === id);
+        if (payment) payment.paid = ichilov.status;
 
-    if (clientSelect && newClientContainer) {
-        clientSelect.addEventListener('change', (e) => {
-            const selectedVal = e.target.value;
-            if (selectedVal === 'החברה מאיכילוב') {
-                const ichilovModal = document.getElementById('ichilov-modal');
-                if (ichilovModal) {
-                    ichilovModal.style.display = 'block';
-                    clientSelect.value = "";
-                }
-            } else if (selectedVal === '__NEW__') {
-                newClientContainer.style.display = 'block';
-                document.getElementById('new-client-name').required = true;
-            } else {
-                newClientContainer.style.display = 'none';
-                document.getElementById('new-client-name').required = false;
-            }
-        });
-    }
-
-    const regularForm = document.getElementById('add-regular-form');
-    if (regularForm) {
-        regularForm.onsubmit = (e) => {
-            e.preventDefault();
-            
-            let client = clientSelect ? clientSelect.value : '';
-            if (client === '__NEW__') {
-                client = document.getElementById('new-client-name').value.trim();
-            }
-
-            if (!client) {
-                alert('אנא בחר או הכנס שם לקוח');
-                return;
-            }
-
-            const type = document.getElementById('job-type').value;
-            const location = document.getElementById('job-location').value;
-            const date = document.getElementById('job-date').value;
-            const amount = parseFloat(document.getElementById('job-amount').value) || 0;
-            const isPaid = document.getElementById('job-status').value === 'true';
-
-            const monthKey = date.substring(0, 7);
-
-            const newEvent = {
-                id: Date.now(),
-                date,
-                client,
-                type,
-                location,
-                amount,
-                isPaid,
-                isIchilov: false
-            };
-
-            if (!currentData[monthKey]) currentData[monthKey] = [];
-            currentData[monthKey].push(newEvent);
-
-            hasUnsavedChanges = true;
-            regularForm.reset();
-            if (newClientContainer) newClientContainer.style.display = 'none';
-            renderDashboard();
-            showStatusMessage('אירוע נוצר! לחץ "שמור שינויים" לעדכון הקובץ.');
-        };
-    }
-
-    renderIchilovDynamicFields('');
-
-    const ichilovForm = document.getElementById('add-ichilov-form');
-    if (ichilovForm) {
-        ichilovForm.onsubmit = (e) => {
-            e.preventDefault();
-            const date = document.getElementById('ichilov-date').value;
-            const location = document.getElementById('ichilov-location').value;
-            const isPaid = document.getElementById('ichilov-status').value === 'true';
-
-            const inputData = gatherIchilovInputsData('');
-            const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.totalMins);
-            const monthKey = date.substring(0, 7);
-
-            const showsTypesSummary = inputData.showsTypesArray.map((t, idx) => `מופע ${idx+1} (${t})`).join(', ');
-
-            const newEvent = {
-                id: Date.now(),
-                date,
-                client: 'החברה מאיכילוב',
-                type: `${inputData.count} מופעים`,
-                location,
-                amount: calc.totalPay,
-                isPaid,
-                isIchilov: true,
-                ichilovData: {
-                    showsCount: inputData.count,
-                    showsTypesArray: inputData.showsTypesArray,
-                    showsTypesSummary,
-                    kmSegmentsArray: inputData.kmSegmentsArray,
-                    timeThere: inputData.timeThere,
-                    timeBack: inputData.timeBack,
-                    timeTransfers: inputData.timeTransfers,
-                    totalMins: inputData.totalMins,
-                    location,
-                    calcDetails: calc
-                }
-            };
-
-            if (!currentData[monthKey]) currentData[monthKey] = [];
-            currentData[monthKey].push(newEvent);
-
-            hasUnsavedChanges = true;
-            renderDashboard();
-            ichilovForm.reset();
-            renderIchilovDynamicFields('');
-            updateIchilovPreviewUnified('');
-            showStatusMessage('מופע איכילוב נוסף! לחץ "שמור שינויים" לעדכון הקובץ.');
-        };
+        await saveData();
+        renderAll();
+        showStatus('סטטוס תשלום איכילוב עודכן', 'success');
     }
 }
 
-// ==========================================
-// 11. אתחול האפליקציה בטעינה
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    setupModal();
-    setupTabs();
-    setupForms();
-    setupIchilovModal();
+async function markAsPaidAndRefresh(id) {
+    await togglePaymentStatus(id);
+}
 
-    const monthSelect = document.getElementById('month-select');
-    if (monthSelect) {
-        monthSelect.addEventListener('change', (e) => {
-            const newMonth = e.target.value;
-            
-            if (!newMonth) {
-                e.target.value = selectedMonth;
-                showStatusMessage('פעולת איפוס החודש בוטלה כדי למנוע היעלמות נתונים.', true);
-                return;
-            }
-
-            selectedMonth = newMonth;
-            renderDashboard();
-        });
+async function deletePayment(id) {
+    if (!confirm('האם אתה בטוחที่คุณ מעוניין למחוק אירוע זה?')) return;
+    
+    const payment = currentData.payments.find(p => p.id === id);
+    if (payment && payment.refId) {
+        // מחיקת רשומת איכילוב המקושרת
+        currentData.ichilovShows = currentData.ichilovShows.filter(i => i.id !== payment.refId);
     }
 
-    loadData();
-});
+    currentData.payments = currentData.payments.filter(p => p.id !== id);
+    await saveData();
+    renderAll();
+    showStatus('האירוע נמחק בהצלחה', 'info');
+}
+
+async function deleteIchilovRecord(id) {
+    if (!confirm('האם אתה בטוח שברצונך למחוק מופע איכילוב זה?')) return;
+
+    currentData.ichilovShows = currentData.ichilovShows.filter(i => i.id !== id);
+    currentData.payments = currentData.payments.filter(p => p.refId !== id);
+    
+    await saveData();
+    renderAll();
+    showStatus('מופע איכילוב נמחק בהצלחה', 'info');
+}
+
+// פונקציית עזר למניעת XSS בטוח
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
