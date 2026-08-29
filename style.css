@@ -198,6 +198,30 @@ h1 {
     font-size: 0.95rem;
 }
 
+/* עיצוב שדות שעות ודקות החדשים עם תוויות מתחתיהם */
+.time-inputs-grid {
+    display: flex;
+    gap: 5px;
+}
+
+.time-input-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.time-input-wrap input {
+    width: 100%;
+    text-align: center;
+}
+
+.time-sub-label {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 3px;
+}
+
 .calc-preview {
     background: #f8f9fa;
     border: 1px dashed var(--secondary-color);
