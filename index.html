@@ -41,14 +41,14 @@
 
         <!-- טפסים להוספת אירוע/לקוח -->
         <section class="forms-container">
-            <!-- לשוניות מעבר בין טפסים -->
+            <!-- לשוניות מעבר בין טפסים (חובות פתוחים ראשונה) -->
             <div class="tabs">
                 <button class="tab-btn active" data-tab="unpaid-overview">⏳ חובות פתוחים</button>
                 <button class="tab-btn" data-tab="regular-form">הוספת לקוח / עבודה רגילה</button>
                 <button class="tab-btn" data-tab="ichilov-form">מחשבון מופע איכילוב</button>
             </div>
 
-            <!-- לשונית חדשה: חובות פתוחים מכל החודשים -->
+            <!-- לשונית ראשונה: חובות פתוחים מכל החודשים -->
             <div id="unpaid-overview" class="tab-content active">
                 <h2>תשלומים ממתינים לגבייה (כל החודשים)</h2>
                 <div style="margin-bottom: 15px; font-size: 1.1rem; font-weight: bold; color: var(--danger-color);" id="total-unpaid-summary">
@@ -128,8 +128,8 @@
                             <input type="date" id="ichilov-date" required>
                         </div>
                         <div class="form-group">
-                            <label for="ichilov-location">מיקום עיקרי / מחלקה</label>
-                            <input type="text" id="ichilov-location" placeholder="שם בית החולים / מחלקה" required>
+                            <label for="ichilov-location">מיקום</label>
+                            <input type="text" id="ichilov-location" required>
                         </div>
                         <div class="form-group">
                             <label for="ichilov-shows-count">כמות מופעים ביום</label>
@@ -151,18 +151,36 @@
                         <!-- יתמלא דינמית בהתאם לכמות המופעים -->
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="ichilov-time-there">זמן נסיעה הלוך ראשון (דקות)</label>
-                            <input type="number" id="ichilov-time-there" min="0" placeholder="0" required>
+                    <!-- זמני נסיעה הלוך, חזור ומעברים עם הפרדה לשעות ודקות -->
+                    <div style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <strong style="display: block; margin-bottom: 10px;">זמני נסיעה:</strong>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>הלוך ראשון - שעות</label>
+                                <input type="number" id="ichilov-time-there-hrs" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>הלוך ראשון - דקות</label>
+                                <input type="number" id="ichilov-time-there-mins" min="0" max="59" value="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label>חזור אחרון - שעות</label>
+                                <input type="number" id="ichilov-time-back-hrs" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>חזור אחרון - דקות</label>
+                                <input type="number" id="ichilov-time-back-mins" min="0" max="59" value="0" required>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="ichilov-time-back">זמן נסיעה חזור אחרון (דקות)</label>
-                            <input type="number" id="ichilov-time-back" min="0" placeholder="0" required>
-                        </div>
-                        <div class="form-group" id="ichilov-extra-times-container" style="display: none;">
-                            <label for="ichilov-time-transfers">זמן נסיעה במעברים בין מופעים (דקות)</label>
-                            <input type="number" id="ichilov-time-transfers" min="0" placeholder="0" value="0">
+                        <div class="form-row" id="ichilov-extra-times-container" style="display: none; margin-top: 10px;">
+                            <div class="form-group">
+                                <label>מעברים בין מופעים - שעות</label>
+                                <input type="number" id="ichilov-time-transfers-hrs" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>מעברים בין מופעים - דקות</label>
+                                <input type="number" id="ichilov-time-transfers-mins" min="0" max="59" value="0">
+                            </div>
                         </div>
                     </div>
 
@@ -220,7 +238,7 @@
                             <th>תאריך</th>
                             <th>מיקום</th>
                             <th>פירוט מופעים</th>
-                            <th>סה"כ ק"מ (מסלול)</th>
+                            <th>מרחק נסיעה כולל בק"מ</th>
                             <th>זמן נסיעה כולל</th>
                             <th>שכר בסיס</th>
                             <th>נסיעות</th>
@@ -274,8 +292,8 @@
                         <input type="date" id="modal-ichilov-date" required>
                     </div>
                     <div class="form-group">
-                        <label for="modal-ichilov-location">מיקום עיקרי / מחלקה</label>
-                        <input type="text" id="modal-ichilov-location" placeholder="שם בית החולים / מחלקה" required>
+                        <label for="modal-ichilov-location">מיקום</label>
+                        <input type="text" id="modal-ichilov-location" required>
                     </div>
                     <div class="form-group">
                         <label for="modal-ichilov-shows-count">כמות מופעים ביום</label>
@@ -295,18 +313,35 @@
                     <!-- יתמלא דינמית במודאל -->
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="modal-ichilov-time-there">זמן נסיעה הלוך ראשון (דקות)</label>
-                        <input type="number" id="modal-ichilov-time-there" min="0" placeholder="0" required>
+                <div style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <strong style="display: block; margin-bottom: 10px;">זמני נסיעה:</strong>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>הלוך ראשון - שעות</label>
+                            <input type="number" id="modal-ichilov-time-there-hrs" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>הלוך ראשון - דקות</label>
+                            <input type="number" id="modal-ichilov-time-there-mins" min="0" max="59" value="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>חזור אחרון - שעות</label>
+                            <input type="number" id="modal-ichilov-time-back-hrs" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>חזור אחרון - דקות</label>
+                            <input type="number" id="modal-ichilov-time-back-mins" min="0" max="59" value="0" required>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="modal-ichilov-time-back">זמן נסיעה חזור אחרון (דקות)</label>
-                        <input type="number" id="modal-ichilov-time-back" min="0" placeholder="0" required>
-                    </div>
-                    <div class="form-group" id="modal-ichilov-extra-times-container" style="display: none;">
-                        <label for="modal-ichilov-time-transfers">זמן נסיעה במעברים בין מופעים (דקות)</label>
-                        <input type="number" id="modal-ichilov-time-transfers" min="0" placeholder="0" value="0">
+                    <div class="form-row" id="modal-ichilov-extra-times-container" style="display: none; margin-top: 10px;">
+                        <div class="form-group">
+                            <label>מעברים בין מופעים - שעות</label>
+                            <input type="number" id="modal-ichilov-time-transfers-hrs" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>מעברים בין מופעים - דקות</label>
+                            <input type="number" id="modal-ichilov-time-transfers-mins" min="0" max="59" value="0">
+                        </div>
                     </div>
                 </div>
 
