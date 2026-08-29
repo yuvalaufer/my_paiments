@@ -189,7 +189,6 @@ h1 {
     font-size: 0.9rem;
     font-weight: bold;
     margin-bottom: 5px;
-
 }
 
 .form-group input, .form-group select {
@@ -304,12 +303,16 @@ th {
 
 .modal-content {
     background: white;
-    margin: 10% auto;
+    margin: 5% auto;
     padding: 25px;
     border-radius: 12px;
     width: 90%;
-    max-width: 500px;
+    max-width: 650px;
+    max-height: 85vh; /* מגביל את הגובה ומאפשר גלילה במובייל */
+    overflow-y: auto;  /* מפעיל פס גלילה פנימי */
+    -webkit-overflow-scrolling: touch; /* גלילה חלקה באייפון */
     position: relative;
+    box-sizing: border-box;
 }
 
 .close-btn {
@@ -318,4 +321,5 @@ th {
     top: 15px;
     font-size: 1.5rem;
     cursor: pointer;
+    z-index: 10;
 }
