@@ -154,23 +154,41 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>זמן נסיעה הלוך ראשון:</label>
-                            <div style="display: flex; gap: 5px;">
-                                <div style="flex: 1;"><input type="number" id="ichilov-hours-there" min="0" placeholder="שעות" value="0" class="form-control" required></div>
-                                <div style="flex: 1;"><input type="number" id="ichilov-mins-there" min="0" max="59" placeholder="דקות" value="0" class="form-control" required></div>
+                            <div class="time-inputs-grid">
+                                <div class="time-input-wrap">
+                                    <input type="number" id="ichilov-hours-there" min="0" value="0" class="form-control" required>
+                                    <span class="time-sub-label">שעות</span>
+                                </div>
+                                <div class="time-input-wrap">
+                                    <input type="number" id="ichilov-mins-there" min="0" max="59" value="0" class="form-control" required>
+                                    <span class="time-sub-label">דקות</span>
+                                </div>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>זמן נסיעה חזור אחרון:</label>
-                            <div style="display: flex; gap: 5px;">
-                                <div style="flex: 1;"><input type="number" id="ichilov-hours-back" min="0" placeholder="שעות" value="0" class="form-control" required></div>
-                                <div style="flex: 1;"><input type="number" id="ichilov-mins-back" min="0" max="59" placeholder="דקות" value="0" class="form-control" required></div>
+                            <div class="time-inputs-grid">
+                                <div class="time-input-wrap">
+                                    <input type="number" id="ichilov-hours-back" min="0" value="0" class="form-control" required>
+                                    <span class="time-sub-label">שעות</span>
+                                </div>
+                                <div class="time-input-wrap">
+                                    <input type="number" id="ichilov-mins-back" min="0" max="59" value="0" class="form-control" required>
+                                    <span class="time-sub-label">דקות</span>
+                                </div>
                             </div>
                         </div>
                         <div class="form-group" id="ichilov-extra-times-container" style="display: none;">
                             <label>זמן נסיעה במעברים בין מופעים:</label>
-                            <div style="display: flex; gap: 5px;">
-                                <div style="flex: 1;"><input type="number" id="ichilov-hours-transfers" min="0" placeholder="שעות" value="0" class="form-control"></div>
-                                <div style="flex: 1;"><input type="number" id="ichilov-mins-transfers" min="0" max="59" placeholder="דקות" value="0" class="form-control"></div>
+                            <div class="time-inputs-grid">
+                                <div class="time-input-wrap">
+                                    <input type="number" id="ichilov-hours-transfers" min="0" value="0" class="form-control">
+                                    <span class="time-sub-label">שעות</span>
+                                </div>
+                                <div class="time-input-wrap">
+                                    <input type="number" id="ichilov-mins-transfers" min="0" max="59" value="0" class="form-control">
+                                    <span class="time-sub-label">דקות</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -307,23 +325,41 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>זמן נסיעה הלוך ראשון:</label>
-                        <div style="display: flex; gap: 5px;">
-                            <div style="flex: 1;"><input type="number" id="modal-ichilov-hours-there" min="0" placeholder="שעות" value="0" class="form-control" required></div>
-                            <div style="flex: 1;"><input type="number" id="modal-ichilov-mins-there" min="0" max="59" placeholder="דקות" value="0" class="form-control" required></div>
+                        <div class="time-inputs-grid">
+                            <div class="time-input-wrap">
+                                <input type="number" id="modal-ichilov-hours-there" min="0" value="0" class="form-control" required>
+                                <span class="time-sub-label">שעות</span>
+                            </div>
+                            <div class="time-input-wrap">
+                                <input type="number" id="modal-ichilov-mins-there" min="0" max="59" value="0" class="form-control" required>
+                                <span class="time-sub-label">דקות</span>
+                            </div>
                         </div>
                     </div>
                     <div class="form-group">
                         <label>זמן נסיעה חזור אחרון:</label>
-                        <div style="display: flex; gap: 5px;">
-                            <div style="flex: 1;"><input type="number" id="modal-ichilov-hours-back" min="0" placeholder="שעות" value="0" class="form-control" required></div>
-                            <div style="flex: 1;"><input type="number" id="modal-ichilov-mins-back" min="0" max="59" placeholder="דקות" value="0" class="form-control" required></div>
+                        <div class="time-inputs-grid">
+                            <div class="time-input-wrap">
+                                <input type="number" id="modal-ichilov-hours-back" min="0" value="0" class="form-control" required>
+                                <span class="time-sub-label">שעות</span>
+                            </div>
+                            <div class="time-input-wrap">
+                                <input type="number" id="modal-ichilov-mins-back" min="0" max="59" value="0" class="form-control" required>
+                                <span class="time-sub-label">דקות</span>
+                            </div>
                         </div>
                     </div>
                     <div class="form-group" id="modal-ichilov-extra-times-container" style="display: none;">
                         <label>זמן נסיעה במעברים בין מופעים:</label>
-                        <div style="display: flex; gap: 5px;">
-                            <div style="flex: 1;"><input type="number" id="modal-ichilov-hours-transfers" min="0" placeholder="שעות" value="0" class="form-control"></div>
-                            <div style="flex: 1;"><input type="number" id="modal-ichilov-mins-transfers" min="0" max="59" placeholder="דקות" value="0" class="form-control"></div>
+                        <div class="time-inputs-grid">
+                            <div class="time-input-wrap">
+                                <input type="number" id="modal-ichilov-hours-transfers" min="0" value="0" class="form-control">
+                                <span class="time-sub-label">שעות</span>
+                            </div>
+                            <div class="time-input-wrap">
+                                <input type="number" id="modal-ichilov-mins-transfers" min="0" max="59" value="0" class="form-control">
+                                <span class="time-sub-label">דקות</span>
+                            </div>
                         </div>
                     </div>
                 </div>
