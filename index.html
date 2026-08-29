@@ -43,12 +43,39 @@
         <section class="forms-container">
             <!-- לשוניות מעבר בין טפסים -->
             <div class="tabs">
-                <button class="tab-btn active" data-tab="regular-form">הוספת לקוח / עבודה רגילה</button>
+                <button class="tab-btn active" data-tab="unpaid-overview">⏳ חובות פתוחים</button>
+                <button class="tab-btn" data-tab="regular-form">הוספת לקוח / עבודה רגילה</button>
                 <button class="tab-btn" data-tab="ichilov-form">מחשבון מופע איכילוב</button>
             </div>
 
+            <!-- לשונית חדשה: חובות פתוחים מכל החודשים -->
+            <div id="unpaid-overview" class="tab-content active">
+                <h2>תשלומים ממתינים לגבייה (כל החודשים)</h2>
+                <div style="margin-bottom: 15px; font-size: 1.1rem; font-weight: bold; color: var(--danger-color);" id="total-unpaid-summary">
+                    סך הכל ממתין לגבייה: ₪0
+                </div>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>חודש</th>
+                                <th>תאריך</th>
+                                <th>לקוח</th>
+                                <th>סוג / פרטים</th>
+                                <th>מיקום</th>
+                                <th>סכום</th>
+                                <th>פעולה</th>
+                            </tr>
+                        </thead>
+                        <tbody id="global-unpaid-list">
+                            <!-- יתמלא אוטומטית מה-JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- טופס 1: עבודה רגילה -->
-            <div id="regular-form" class="tab-content active">
+            <div id="regular-form" class="tab-content">
                 <h2>הוספת אירוע / לקוח רגיל</h2>
                 <form id="add-regular-form">
                     <div class="form-row">
