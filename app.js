@@ -50,20 +50,17 @@ function formatMinutesToHHMM(totalMinutes) {
 // 3. מחשבון איכילוב (עם תמיכה במספר מופעים ומקטעי ק"מ)
 // ==========================================
 function calculateIchilovAdvanced(showsTypesArray, kmSegmentsArray, totalMins) {
-    // 1. שכר בסיס: סכום פרטני לכל מופע (רגיל = 670, ארוך = 840)
     let basePay = 0;
     showsTypesArray.forEach(type => {
         basePay += (type === "ארוך") ? 840 : 670;
     });
 
-    // 2. החזר קילומטראז': סכום כל מקטעי המסלול הרציף כפול 0.5 ₪
     let totalKm = 0;
     kmSegmentsArray.forEach(km => {
         totalKm += (parseFloat(km) || 0);
     });
     const kmPay = totalKm * 0.5;
 
-    // 3. תוספת זמן נסיעה: קיזוז 120 דקות ראשונות, 70 ₪ לשעה או חלק ממנה
     let excessMins = 0;
     let timePay = 0;
     if (totalMins > 120) {
@@ -86,7 +83,6 @@ function calculateIchilovAdvanced(showsTypesArray, kmSegmentsArray, totalMins) {
     };
 }
 
-// פונקציית בניית שדות דינמיים בטפסים (סוגי מופעים ומקטעי ק"מ לפי כמות המופעים)
 function renderIchilovDynamicFields(prefix = '') {
     const countSelect = document.getElementById(`${prefix}ichilov-shows-count`);
     const typesContainer = document.getElementById(`${prefix}ichilov-shows-types-container`);
@@ -97,12 +93,10 @@ function renderIchilovDynamicFields(prefix = '') {
 
     const count = parseInt(countSelect.value, 10) || 1;
 
-    // הצגת/הסתרת שדה זמן מעברים
     if (extraTimesContainer) {
         extraTimesContainer.style.display = count > 1 ? 'block' : 'none';
     }
 
-    // בניית שדות סוג מופע לכל מופע
     let typesHTML = '<strong>סוג מופע לכל אחד מהמופעים:</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
     for (let i = 1; i <= count; i++) {
         typesHTML += `
@@ -118,7 +112,6 @@ function renderIchilovDynamicFields(prefix = '') {
     typesHTML += '</div>';
     typesContainer.innerHTML = typesHTML;
 
-    // בניית שדות ק"מ לפי מקטעי המסלול הרציף
     let kmHTML = '<strong>קילומטראז\' למקטעי המסלול (בק"מ):</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
     
     if (count === 1) {
@@ -129,14 +122,12 @@ function renderIchilovDynamicFields(prefix = '') {
             </div>
         `;
     } else {
-        // מקטע 1: הלוך למופע ראשון
         kmHTML += `
             <div style="flex: 1; min-width: 150px;">
                 <label style="font-size: 13px;">בית ➔ מופע 1:</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
-        // מקטעי מעבר בין מופעים
         for (let i = 1; i < count; i++) {
             kmHTML += `
                 <div style="flex: 1; min-width: 150px;">
@@ -145,7 +136,6 @@ function renderIchilovDynamicFields(prefix = '') {
                 </div>
             `;
         }
-        // מקטע חזור אחרון מהמופע האחרון הביתה
         kmHTML += `
             <div style="flex: 1; min-width: 150px;">
                 <label style="font-size: 13px;">מופע ${count} ➔ הביתה:</label>
@@ -156,7 +146,6 @@ function renderIchilovDynamicFields(prefix = '') {
     kmHTML += '</div>';
     kmContainer.innerHTML = kmHTML;
 
-    // חיבור מחדש של אירועי שינוי לעדכון תצוגה מקדימה
     attachIchilovListeners(prefix);
 }
 
@@ -176,10 +165,8 @@ function gatherIchilovInputsData(prefix = '') {
         const kmEl = document.getElementById(`${prefix}ichilov-km-${i}`);
         const val = kmEl ? parseFloat(kmEl.value) || 0 : 0;
         if (count === 1) {
-            // מופע יחיד: הלוך ושוב נחשב פי 2
             kmSegmentsArray.push(val * 2);
         } else {
-            // מספר מופעים: מקטעים רציפים ישירים
             kmSegmentsArray.push(val);
         }
     }
@@ -220,7 +207,6 @@ function attachIchilovListeners(prefix = '') {
         });
     }
 
-    // האזנה לכל שדות הסוג והק"מ והזמנים הדינמיים
     const container = document.getElementById(prefix ? 'ichilov-modal' : 'ichilov-form');
     if (container) {
         container.querySelectorAll('input, select').forEach(el => {
@@ -384,7 +370,87 @@ function renderDashboard() {
 
     updateClientsDropdown();
     renderSaveButton();
+    renderGlobalUnpaidTable(); // עדכון אוטומטי לטבלת חובות פתוחים
 }
+
+// ==========================================
+// 5. ניהול טבלת חובות פתוחים גלובלית ומעבר חודש מהיר
+// ==========================================
+function renderGlobalUnpaidTable() {
+    const unpaidListEl = document.getElementById('global-unpaid-list');
+    const totalUnpaidSummaryEl = document.getElementById('total-unpaid-summary');
+    if (!unpaidListEl) return;
+
+    unpaidListEl.innerHTML = '';
+    let grandTotalUnpaid = 0;
+    let hasItems = false;
+
+    Object.keys(currentData).sort().forEach(monthKey => {
+        const events = currentData[monthKey];
+        if (!Array.isArray(events)) return;
+
+        events.forEach(item => {
+            if (!item.isPaid) {
+                hasItems = true;
+                const itemAmount = Number(item.amount) || 0;
+                grandTotalUnpaid += itemAmount;
+
+                const tr = document.createElement('tr');
+                
+                let displayType = item.type || '';
+                let displayLocation = item.location || '';
+                if (item.isIchilov && item.ichilovData) {
+                    displayType = item.ichilovData.showsTypesSummary || item.type;
+                    displayLocation = item.ichilovData.location || item.location;
+                }
+
+                tr.innerHTML = `
+                    <td><strong>${monthKey}</strong></td>
+                    <td>${item.date || ''}</td>
+                    <td>${item.client || ''}</td>
+                    <td>${displayType}</td>
+                    <td>${displayLocation}</td>
+                    <td><strong>₪${itemAmount.toLocaleString()}</strong></td>
+                    <td>
+                        <button class="status-btn unpaid" onclick="window.jumpToMonthAndEvent('${monthKey}')" style="cursor: pointer;">
+                            🔍 צפה בחודש
+                        </button>
+                    </td>
+                `;
+                unpaidListEl.appendChild(tr);
+            }
+        });
+    });
+
+    if (!hasItems) {
+        unpaidListEl.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--success-color); font-weight: bold; padding: 20px;">אין תשלומים ממתינים לגבייה! הכל שולם 🌟</td></tr>`;
+    }
+
+    if (totalUnpaidSummaryEl) {
+        totalUnpaidSummaryEl.textContent = `סך הכל ממתין לגבייה בכל החודשים: ₪${grandTotalUnpaid.toLocaleString()}`;
+    }
+}
+
+window.jumpToMonthAndEvent = function(monthKey) {
+    selectedMonth = monthKey;
+    
+    const monthPicker = document.getElementById('month-select');
+    if (monthPicker) {
+        monthPicker.value = monthKey;
+    }
+
+    // מעבר לטאב ניהול עבודה רגילה כדי לראות את נתוני החודש הנבחר
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+    const regularTabBtn = document.querySelector('[data-tab="regular-form"]');
+    const regularTabContent = document.getElementById('regular-form');
+    if (regularTabBtn) regularTabBtn.classList.add('active');
+    if (regularTabContent) regularTabContent.classList.add('active');
+
+    renderDashboard();
+    showStatusMessage(`עברת לתצוגת חודש ${monthKey}`);
+};
 
 function renderSaveButton() {
     let saveBtnContainer = document.getElementById('save-changes-container');
@@ -410,7 +476,7 @@ function renderSaveButton() {
 }
 
 // ==========================================
-// 5. שינוי סטטוס תשלום + שמירה ל-GitHub
+// 6. שינוי סטטוס תשלום + שמירה ל-GitHub
 // ==========================================
 window.handleStatusChange = function(id, value) {
     const monthEvents = currentData[selectedMonth] || [];
@@ -513,7 +579,7 @@ window.deleteEvent = function(id) {
 };
 
 // ==========================================
-// 6. ניהול חלון הגדרות GitHub (Modal)
+// 7. ניהול חלון הגדרות GitHub (Modal)
 // ==========================================
 function setupModal() {
     const modal = document.getElementById('settings-modal');
@@ -576,7 +642,7 @@ function setupModal() {
 }
 
 // ==========================================
-// 7. ניהול לשוניות (Tabs)
+// 8. ניהול לשוניות (Tabs)
 // ==========================================
 function setupTabs() {
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -594,7 +660,7 @@ function setupTabs() {
 }
 
 // ==========================================
-// 8. ניהול מודאל איכילוב מהטופס הראשי
+// 9. ניהול מודאל איכילוב מהטופס הראשי
 // ==========================================
 function setupIchilovModal() {
     const modal = document.getElementById('ichilov-modal');
@@ -657,7 +723,7 @@ function setupIchilovModal() {
 }
 
 // ==========================================
-// 9. הוספת אירועים (כולל האזנה לבחירת איכילוב בטופס הראשי)
+// 10. הוספת אירועים (כולל האזנה לבחירת איכילוב בטופס הראשי)
 // ==========================================
 function setupForms() {
     const clientSelect = document.getElementById('client-select');
@@ -780,7 +846,7 @@ function setupForms() {
 }
 
 // ==========================================
-// 10. אתחול האפליקציה בטעינה
+// 11. אתחול האפליקציה בטעינה
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     setupModal();
@@ -793,7 +859,6 @@ document.addEventListener('DOMContentLoaded', () => {
         monthSelect.addEventListener('change', (e) => {
             const newMonth = e.target.value;
             
-            // מניעת איפוס בשגגה במקרה של לחיצה על Clear
             if (!newMonth) {
                 e.target.value = selectedMonth;
                 showStatusMessage('פעולת איפוס החודש בוטלה כדי למנוע היעלמות נתונים.', true);
