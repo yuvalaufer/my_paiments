@@ -47,7 +47,7 @@ function formatMinutesToHHMM(totalMinutes) {
 }
 
 // ==========================================
-// 3. מחשבון איכילוב (מתוקן לפי הכללים)
+// 3. מחשבון איכילוב (מתוקן: הוסרה לחלוטין האופציה "זוגי")
 // ==========================================
 function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const km = parseFloat(kmOneWay) || 0;
@@ -58,8 +58,7 @@ function calculateIchilov(showType, kmOneWay, timeThere, timeBack) {
     const totalMins = tThereMins + tBackMins;
 
     let basePay = 670;
-    if (showType === "זוגי") basePay = 250;
-    else if (showType === "ארוך") basePay = 840;
+    if (showType === "ארוך") basePay = 840;
 
     // החזר קילומטראז': 0.5 ₪ לכל ק"מ (סך הק"מ הלוך-חזור)
     const kmPay = totalKm * 0.5;  
@@ -470,7 +469,85 @@ function setupTabs() {
 }
 
 // ==========================================
-// 8. הוספת אירועים
+// 8. ניהול מודאל איכילוב מהטופס הראשי
+// ==========================================
+function setupIchilovModal() {
+    const modal = document.getElementById('ichilov-modal');
+    const closeBtn = document.getElementById('close-ichilov-modal');
+    const form = document.getElementById('modal-ichilov-form');
+
+    if (closeBtn && modal) {
+        closeBtn.onclick = () => { modal.style.display = 'none'; };
+    }
+
+    const updateModalPreview = () => {
+        const showType = document.getElementById('modal-ichilov-show-type')?.value || 'רגיל';
+        const km = document.getElementById('modal-ichilov-km')?.value || 0;
+        const timeThere = document.getElementById('modal-ichilov-time-there')?.value || 0;
+        const timeBack = document.getElementById('modal-ichilov-time-back')?.value || 0;
+
+        const calc = calculateIchilov(showType, km, timeThere, timeBack);
+        const previewEl = document.getElementById('modal-calc-breakdown');
+        if (previewEl) {
+            previewEl.innerHTML = `שכר בסיס: ₪${calc.basePay} | נסיעות: ₪${calc.kmPay} (${parseFloat(km)*2} ק"מ) | תוספת זמן: ₪${calc.timePay} (${calc.totalHoursStr}) | <strong>סה"כ: ₪${calc.totalPay}</strong>`;
+        }
+    };
+
+    ['modal-ichilov-show-type', 'modal-ichilov-km', 'modal-ichilov-time-there', 'modal-ichilov-time-back'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', updateModalPreview);
+            input.addEventListener('change', updateModalPreview);
+        }
+    });
+
+    if (form) {
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            const date = document.getElementById('modal-ichilov-date').value;
+            const location = document.getElementById('modal-ichilov-location').value;
+            const showType = document.getElementById('modal-ichilov-show-type').value;
+            const kmOneWay = parseFloat(document.getElementById('modal-ichilov-km').value) || 0;
+            const timeThere = document.getElementById('modal-ichilov-time-there').value;
+            const timeBack = document.getElementById('modal-ichilov-time-back').value;
+            const isPaid = document.getElementById('modal-ichilov-status').value === 'true';
+
+            const calc = calculateIchilov(showType, kmOneWay, timeThere, timeBack);
+            const monthKey = date.substring(0, 7);
+
+            const newEvent = {
+                id: Date.now(),
+                date,
+                client: 'החברה מאיכילוב',
+                type: `מופע (${showType})`,
+                location,
+                amount: calc.totalPay,
+                isPaid,
+                isIchilov: true,
+                ichilovData: {
+                    showType,
+                    kmOneWay,
+                    timeThere,
+                    timeBack,
+                    location,
+                    calcDetails: calc
+                }
+            };
+
+            if (!currentData[monthKey]) currentData[monthKey] = [];
+            currentData[monthKey].push(newEvent);
+
+            hasUnsavedChanges = true;
+            renderDashboard();
+            form.reset();
+            if (modal) modal.style.display = 'none';
+            showStatusMessage('מופע איכילוב נוסף בהצלחה! לחץ "שמור שינויים".');
+        };
+    }
+}
+
+// ==========================================
+// 9. הוספת אירועים (כולל האזנה לבחירת איכילוב בטופס הראשי)
 // ==========================================
 function setupForms() {
     const clientSelect = document.getElementById('client-select');
@@ -478,7 +555,15 @@ function setupForms() {
 
     if (clientSelect && newClientContainer) {
         clientSelect.addEventListener('change', (e) => {
-            if (e.target.value === '__NEW__') {
+            const selectedVal = e.target.value;
+            if (selectedVal === 'החברה מאיכילוב') {
+                const ichilovModal = document.getElementById('ichilov-modal');
+                if (ichilovModal) {
+                    ichilovModal.style.display = 'block';
+                    // איפוס בחירת הלקוח בטופס הרגיל כדי שלא יישאר שם תקוע
+                    clientSelect.value = "";
+                }
+            } else if (selectedVal === '__NEW__') {
                 newClientContainer.style.display = 'block';
                 document.getElementById('new-client-name').required = true;
             } else {
@@ -588,12 +673,13 @@ function setupForms() {
 }
 
 // ==========================================
-// 9. אתחול האפליקציה בטעינה
+// 10. אתחול האפליקציה בטעינה
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     setupModal();
     setupTabs();
     setupForms();
+    setupIchilovModal();
 
     const monthSelect = document.getElementById('month-select');
     if (monthSelect) {
