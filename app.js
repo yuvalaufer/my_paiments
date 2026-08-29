@@ -791,7 +791,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthSelect = document.getElementById('month-select');
     if (monthSelect) {
         monthSelect.addEventListener('change', (e) => {
-            selectedMonth = e.target.value;
+            const newMonth = e.target.value;
+            
+            // מניעת איפוס בשגגה במקרה של לחיצה על Clear
+            if (!newMonth) {
+                e.target.value = selectedMonth;
+                showStatusMessage('פעולת איפוס החודש בוטלה כדי למנוע היעלמות נתונים.', true);
+                return;
+            }
+
+            selectedMonth = newMonth;
             renderDashboard();
         });
     }
