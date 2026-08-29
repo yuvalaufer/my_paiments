@@ -46,17 +46,6 @@ function formatMinutesToHHMM(totalMinutes) {
     return `${hrs}:${mins < 10 ? '0' : ''}${mins}`;
 }
 
-// פונקציית עזר חדשה לקריאת שדות שעות ודקות נפרדים
-function getDurationMinutes(prefix, fieldName) {
-    const hoursEl = document.getElementById(`${prefix}ichilov-${fieldName}-hours`);
-    const minsEl = document.getElementById(`${prefix}ichilov-${fieldName}-mins`);
-    
-    const hours = hoursEl ? (parseInt(hoursEl.value, 10) || 0) : 0;
-    const mins = minsEl ? (parseInt(minsEl.value, 10) || 0) : 0;
-    
-    return (hours * 60) + mins;
-}
-
 // ==========================================
 // 3. מחשבון איכילוב (עם תמיכה במספר מופעים ומקטעי ק"מ)
 // ==========================================
@@ -182,9 +171,18 @@ function gatherIchilovInputsData(prefix = '') {
         }
     }
 
-    const timeThere = getDurationMinutes(prefix, 'there');
-    const timeBack = getDurationMinutes(prefix, 'back');
-    const timeTransfers = getDurationMinutes(prefix, 'transfers');
+    const hoursThere = parseInt(document.getElementById(`${prefix}ichilov-hours-there`)?.value, 10) || 0;
+    const minsThere = parseInt(document.getElementById(`${prefix}ichilov-mins-there`)?.value, 10) || 0;
+    const timeThere = (hoursThere * 60) + minsThere;
+
+    const hoursBack = parseInt(document.getElementById(`${prefix}ichilov-hours-back`)?.value, 10) || 0;
+    const minsBack = parseInt(document.getElementById(`${prefix}ichilov-mins-back`)?.value, 10) || 0;
+    const timeBack = (hoursBack * 60) + minsBack;
+
+    const hoursTransfers = parseInt(document.getElementById(`${prefix}ichilov-hours-transfers`)?.value, 10) || 0;
+    const minsTransfers = parseInt(document.getElementById(`${prefix}ichilov-mins-transfers`)?.value, 10) || 0;
+    const timeTransfers = (hoursTransfers * 60) + minsTransfers;
+
     const totalMins = timeThere + timeBack + timeTransfers;
 
     return {
@@ -381,7 +379,7 @@ function renderDashboard() {
 
     updateClientsDropdown();
     renderSaveButton();
-    renderGlobalUnpaidTable();
+    renderGlobalUnpaidTable(); // עדכון אוטומטי לטבלת חובות פתוחים
 }
 
 // ==========================================
@@ -450,6 +448,7 @@ window.jumpToMonthAndEvent = function(monthKey) {
         monthPicker.value = monthKey;
     }
 
+    // מעבר לטאב ניהול עבודה רגילה כדי לראות את נתוני החודש הנבחר
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
@@ -859,7 +858,6 @@ function setupForms() {
 // 11. אתחול האפליקציה בטעינה
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    setupModal->() => {}; // handled below
     setupModal();
     setupTabs();
     setupForms();
