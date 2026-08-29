@@ -60,5 +60,79 @@
       "isPaid": true,
       "isIchilov": false
     }
+  ],
+  "2026-08": [
+    {
+      "id": 1788037245662,
+      "date": "2026-08-24",
+      "client": "החברה מאיכילוב",
+      "type": "1 מופעים",
+      "location": "מרום הגליל",
+      "amount": 915,
+      "isPaid": false,
+      "isIchilov": true,
+      "ichilovData": {
+        "showsCount": 1,
+        "showsTypesArray": [
+          "רגיל"
+        ],
+        "showsTypesSummary": "מופע 1 (רגיל)",
+        "kmSegmentsArray": [
+          210
+        ],
+        "timeThere": 92,
+        "timeBack": 97,
+        "timeTransfers": 0,
+        "totalMins": 189,
+        "location": "מרום הגליל",
+        "calcDetails": {
+          "basePay": 670,
+          "kmPay": 105,
+          "timePay": 140,
+          "totalPay": 915,
+          "totalKm": 210,
+          "totalMins": 189,
+          "excessMins": 69,
+          "totalHoursStr": "3:09",
+          "excessHoursStr": "1:09"
+        }
+      }
+    },
+    {
+      "id": 1788037310419,
+      "date": "2026-08-26",
+      "client": "החברה מאיכילוב",
+      "type": "1 מופעים",
+      "location": "קריית אתא",
+      "amount": 722,
+      "isPaid": false,
+      "isIchilov": true,
+      "ichilovData": {
+        "showsCount": 1,
+        "showsTypesArray": [
+          "רגיל"
+        ],
+        "showsTypesSummary": "מופע 1 (רגיל)",
+        "kmSegmentsArray": [
+          104
+        ],
+        "timeThere": 45,
+        "timeBack": 50,
+        "timeTransfers": 0,
+        "totalMins": 95,
+        "location": "קריית אתא",
+        "calcDetails": {
+          "basePay": 670,
+          "kmPay": 52,
+          "timePay": 0,
+          "totalPay": 722,
+          "totalKm": 104,
+          "totalMins": 95,
+          "excessMins": 0,
+          "totalHoursStr": "1:35",
+          "excessHoursStr": "0:00"
+        }
+      }
+    }
   ]
 }
