@@ -47,7 +47,7 @@ function formatMinutesToHHMM(totalMinutes) {
 }
 
 // ==========================================
-// 3. מחשבון איכילוב (עם תמיכה במספר מופעים ומקטעי ק"מ)
+// 3. מחשבון איכילוב (עם תמיכה במספר מופעים, מיקומים ומקטעי ק"מ)
 // ==========================================
 function calculateIchilovAdvanced(showsTypesArray, kmSegmentsArray, totalMins) {
     let basePay = 0;
@@ -85,11 +85,12 @@ function calculateIchilovAdvanced(showsTypesArray, kmSegmentsArray, totalMins) {
 
 function renderIchilovDynamicFields(prefix = '') {
     const countSelect = document.getElementById(`${prefix}ichilov-shows-count`);
+    const locationsContainer = document.getElementById(`${prefix}ichilov-locations-container`);
     const typesContainer = document.getElementById(`${prefix}ichilov-shows-types-container`);
     const kmContainer = document.getElementById(`${prefix}ichilov-km-container`);
     const extraTimesContainer = document.getElementById(`${prefix}ichilov-extra-times-container`);
 
-    if (!countSelect || !typesContainer || !kmContainer) return;
+    if (!countSelect || !locationsContainer || !typesContainer || !kmContainer) return;
 
     const count = parseInt(countSelect.value, 10) || 1;
 
@@ -97,6 +98,20 @@ function renderIchilovDynamicFields(prefix = '') {
         extraTimesContainer.style.display = count > 1 ? 'block' : 'none';
     }
 
+    // שדות מיקום דינמיים
+    let locationsHTML = '<strong>מיקום לכל אחד מהמופעים:</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
+    for (let i = 1; i <= count; i++) {
+        locationsHTML += `
+            <div style="flex: 1; min-width: 140px;">
+                <label style="font-size: 13px;">מופע #${i} מיקום:</label>
+                <input type="text" id="${prefix}ichilov-location-${i}" class="form-control ichilov-dynamic-location" placeholder="הכנס מיקום מופע ${i}" required>
+            </div>
+        `;
+    }
+    locationsHTML += '</div>';
+    locationsContainer.innerHTML = locationsHTML;
+
+    // שדות סוג מופע דינמיים
     let typesHTML = '<strong>סוג מופע לכל אחד מהמופעים:</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
     for (let i = 1; i <= count; i++) {
         typesHTML += `
@@ -112,6 +127,7 @@ function renderIchilovDynamicFields(prefix = '') {
     typesHTML += '</div>';
     typesContainer.innerHTML = typesHTML;
 
+    // שדות קילומטראז' דינמיים
     let kmHTML = '<strong>קילומטראז\' למקטעי המסלול (בק"מ):</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
     
     if (count === 1) {
@@ -153,6 +169,12 @@ function gatherIchilovInputsData(prefix = '') {
     const countSelect = document.getElementById(`${prefix}ichilov-shows-count`);
     const count = countSelect ? parseInt(countSelect.value, 10) || 1 : 1;
 
+    const locationsArray = [];
+    for (let i = 1; i <= count; i++) {
+        const locEl = document.getElementById(`${prefix}ichilov-location-${i}`);
+        locationsArray.push(locEl ? locEl.value.trim() : '');
+    }
+
     const showsTypesArray = [];
     for (let i = 1; i <= count; i++) {
         const typeEl = document.getElementById(`${prefix}ichilov-show-type-${i}`);
@@ -185,8 +207,13 @@ function gatherIchilovInputsData(prefix = '') {
 
     const totalMins = timeThere + timeBack + timeTransfers;
 
+    // מיקום ראשי משולב לתצוגות קודמות
+    const mainLocation = locationsArray.filter(Boolean).join(', ') || '';
+
     return {
         count,
+        locationsArray,
+        mainLocation,
         showsTypesArray,
         kmSegmentsArray,
         totalMins,
@@ -302,7 +329,7 @@ function renderDashboard() {
     let totalUnpaid = 0;
 
     const mainList = document.getElementById('payments-list');
-    const ichilovList = document.getElementById('ichilov-list');
+    const ichilovList = document.getElementById('ichilov-table') ? document.getElementById('ichilov-table').querySelector('tbody') : document.getElementById('ichilov-list');
 
     if (mainList) mainList.innerHTML = '';
     if (ichilovList) ichilovList.innerHTML = '';
@@ -325,17 +352,27 @@ function renderDashboard() {
                 </select>
             `;
 
+            // טיפול בהצגת מיקום תקינה בטבלה הראשית (גם לאיכילוב עם מיקומים נפרדים)
+            let displayLocation = item.location || '';
+            if (item.isIchilov && item.ichilovData) {
+                if (Array.isArray(item.ichilovData.locationsArray) && item.ichilovData.locationsArray.length > 0) {
+                    displayLocation = item.ichilovData.locationsArray.join(' | ');
+                } else if (item.ichilovData.location) {
+                    displayLocation = item.ichilovData.location;
+                }
+            }
+
             if (mainList) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${item.date || ''}</td>
                     <td>${item.client || ''}</td>
                     <td>${item.type || ''}</td>
-                    <td>${item.location || ''}</td>
+                    <td>${displayLocation}</td>
                     <td>₪${itemAmount.toLocaleString()}</td>
                     <td>${statusSelectHTML}</td>
                     <td>
-                        <button class="btn-delete" onclick="window.deleteEvent(${item.id})">🗑️</button>
+                        <button class="delete-btn" onclick="window.deleteEvent(${item.id})" title="מחק">🗑️</button>
                     </td>
                 `;
                 mainList.appendChild(tr);
@@ -348,7 +385,7 @@ function renderDashboard() {
                 const trI = document.createElement('tr');
                 trI.innerHTML = `
                     <td>${item.date || ''}</td>
-                    <td>${iData.location || item.location || ''}</td>
+                    <td>${displayLocation}</td>
                     <td>${iData.showsTypesSummary || item.type || ''}</td>
                     <td>${calc.totalKm || 0} ק"מ</td>
                     <td>${calc.totalHoursStr || '0:00'}</td>
@@ -358,7 +395,7 @@ function renderDashboard() {
                     <td><strong>₪${itemAmount.toLocaleString()}</strong></td>
                     <td>${statusSelectHTML}</td>
                     <td>
-                        <button class="btn-delete" onclick="window.deleteEvent(${item.id})">🗑️</button>
+                        <button class="delete-btn" onclick="window.deleteEvent(${item.id})" title="מחק">🗑️</button>
                     </td>
                 `;
                 ichilovList.appendChild(trI);
@@ -379,7 +416,7 @@ function renderDashboard() {
 
     updateClientsDropdown();
     renderSaveButton();
-    renderGlobalUnpaidTable(); // עדכון אוטומטי לטבלת חובות פתוחים
+    renderGlobalUnpaidTable();
 }
 
 // ==========================================
@@ -410,7 +447,11 @@ function renderGlobalUnpaidTable() {
                 let displayLocation = item.location || '';
                 if (item.isIchilov && item.ichilovData) {
                     displayType = item.ichilovData.showsTypesSummary || item.type;
-                    displayLocation = item.ichilovData.location || item.location;
+                    if (Array.isArray(item.ichilovData.locationsArray) && item.ichilovData.locationsArray.length > 0) {
+                        displayLocation = item.ichilovData.locationsArray.join(' | ');
+                    } else {
+                        displayLocation = item.ichilovData.location || item.location;
+                    }
                 }
 
                 tr.innerHTML = `
@@ -448,7 +489,6 @@ window.jumpToMonthAndEvent = function(monthKey) {
         monthPicker.value = monthKey;
     }
 
-    // מעבר לטאב ניהול עבודה רגילה כדי לראות את נתוני החודש הנבחר
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
@@ -686,7 +726,6 @@ function setupIchilovModal() {
         form.onsubmit = (e) => {
             e.preventDefault();
             const date = document.getElementById('modal-ichilov-date').value;
-            const location = document.getElementById('modal-ichilov-location').value;
             const isPaid = document.getElementById('modal-ichilov-status').value === 'true';
 
             const inputData = gatherIchilovInputsData('modal-');
@@ -700,12 +739,13 @@ function setupIchilovModal() {
                 date,
                 client: 'החברה מאיכילוב',
                 type: `${inputData.count} מופעים`,
-                location,
+                location: inputData.mainLocation,
                 amount: calc.totalPay,
                 isPaid,
                 isIchilov: true,
                 ichilovData: {
                     showsCount: inputData.count,
+                    locationsArray: inputData.locationsArray,
                     showsTypesArray: inputData.showsTypesArray,
                     showsTypesSummary,
                     kmSegmentsArray: inputData.kmSegmentsArray,
@@ -713,7 +753,7 @@ function setupIchilovModal() {
                     timeBack: inputData.timeBack,
                     timeTransfers: inputData.timeTransfers,
                     totalMins: inputData.totalMins,
-                    location,
+                    location: inputData.mainLocation,
                     calcDetails: calc
                 }
             };
@@ -809,7 +849,6 @@ function setupForms() {
         ichilovForm.onsubmit = (e) => {
             e.preventDefault();
             const date = document.getElementById('ichilov-date').value;
-            const location = document.getElementById('ichilov-location').value;
             const isPaid = document.getElementById('ichilov-status').value === 'true';
 
             const inputData = gatherIchilovInputsData('');
@@ -823,12 +862,13 @@ function setupForms() {
                 date,
                 client: 'החברה מאיכילוב',
                 type: `${inputData.count} מופעים`,
-                location,
+                location: inputData.mainLocation,
                 amount: calc.totalPay,
                 isPaid,
                 isIchilov: true,
                 ichilovData: {
                     showsCount: inputData.count,
+                    locationsArray: inputData.locationsArray,
                     showsTypesArray: inputData.showsTypesArray,
                     showsTypesSummary,
                     kmSegmentsArray: inputData.kmSegmentsArray,
@@ -836,7 +876,7 @@ function setupForms() {
                     timeBack: inputData.timeBack,
                     timeTransfers: inputData.timeTransfers,
                     totalMins: inputData.totalMins,
-                    location,
+                    location: inputData.mainLocation,
                     calcDetails: calc
                 }
             };
