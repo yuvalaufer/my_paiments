@@ -127,35 +127,49 @@ function renderIchilovDynamicFields(prefix = '') {
     typesHTML += '</div>';
     typesContainer.innerHTML = typesHTML;
 
-    // שדות קילומטראז' דינמיים
-    let kmHTML = '<strong>קילומטראז\' למקטעי המסלול (בק"מ):</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
+    // שדות קילומטראז' דינמיים - טור אנכי לבקשתך
+    let kmHTML = '<strong>קילומטראז\' למקטעי המסלול (בק"מ):</strong><div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">';
     
     if (count === 1) {
         kmHTML += `
-            <div style="flex: 1; min-width: 180px;">
-                <label style="font-size: 13px;">ק"מ הלוך (יחושב כהלוך-חזור):</label>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">ק"מ הלוך (יחושב כהלוך-חזור):</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
-    } else {
+    } else if (count === 2) {
         kmHTML += `
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 13px;">בית ➔ מופע 1:</label>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בית ➔ מופע 1:</label> <!-- שומר על תאימות -->
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">בית ➔ מופע 1:</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 1 ➔ מופע 2:</label>
+                <input type="number" id="${prefix}ichilov-km-2" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 2 ➔ הביתה:</label>
+                <input type="number" id="${prefix}ichilov-km-3" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
+            </div>
         `;
-        for (let i = 1; i < count; i++) {
-            kmHTML += `
-                <div style="flex: 1; min-width: 150px;">
-                    <label style="font-size: 13px;">מופע ${i} ➔ מופע ${i+1}:</label>
-                    <input type="number" id="${prefix}ichilov-km-${i+1}" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
-                </div>
-            `;
-        }
+    } else if (count === 3) {
         kmHTML += `
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 13px;">מופע ${count} ➔ הביתה:</label>
-                <input type="number" id="${prefix}ichilov-km-${count+1}" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">בית ➔ מופע 1:</label>
+                <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 1 ➔ מופע 2:</label>
+                <input type="number" id="${prefix}ichilov-km-2" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 2 ➔ מופע 3:</label>
+                <input type="number" id="${prefix}ichilov-km-3" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 3 ➔ הביתה:</label>
+                <input type="number" id="${prefix}ichilov-km-4" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
     }
@@ -207,7 +221,6 @@ function gatherIchilovInputsData(prefix = '') {
 
     const totalMins = timeThere + timeBack + timeTransfers;
 
-    // מיקום ראשי משולב לתצוגות קודמות
     const mainLocation = locationsArray.filter(Boolean).join(', ') || '';
 
     return {
@@ -352,7 +365,6 @@ function renderDashboard() {
                 </select>
             `;
 
-            // טיפול בהצגת מיקום תקינה בטבלה הראשית (גם לאיכילוב עם מיקומים נפרדים)
             let displayLocation = item.location || '';
             if (item.isIchilov && item.ichilovData) {
                 if (Array.isArray(item.ichilovData.locationsArray) && item.ichilovData.locationsArray.length > 0) {
@@ -525,7 +537,7 @@ function renderSaveButton() {
 }
 
 // ==========================================
-// 6. שינוי סטטוס תשלום + שמירה ל-GitHub
+// 6. שינוי סטטוס תשלום + שמירה לגלובל/GitHub
 // ==========================================
 window.handleStatusChange = function(id, value) {
     const monthEvents = currentData[selectedMonth] || [];
