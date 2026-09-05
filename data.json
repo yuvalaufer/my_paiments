@@ -134,5 +134,52 @@
         }
       }
     }
+  ],
+  "2026-09": [
+    {
+      "id": 1788631550549,
+      "date": "2026-09-03",
+      "client": "החברה מאיכילוב",
+      "type": "2 מופעים",
+      "location": "ליפתא ירושלים, בראון ים המלח",
+      "amount": 1906,
+      "isPaid": false,
+      "isIchilov": true,
+      "ichilovData": {
+        "showsCount": 2,
+        "locationsArray": [
+          "ליפתא ירושלים",
+          "בראון ים המלח"
+        ],
+        "showsTypesArray": [
+          "רגיל",
+          "רגיל"
+        ],
+        "showsTypesSummary": "מופע 1 (רגיל), מופע 2 (רגיל)",
+        "kmSegmentsArray": [
+          112,
+          110,
+          210
+        ],
+        "timeSegmentsArray": [
+          103,
+          107,
+          194
+        ],
+        "totalMins": 404,
+        "location": "ליפתא ירושלים, בראון ים המלח",
+        "calcDetails": {
+          "basePay": 1340,
+          "kmPay": 216,
+          "timePay": 350,
+          "totalPay": 1906,
+          "totalKm": 432,
+          "totalMins": 404,
+          "excessMins": 284,
+          "totalHoursStr": "6:44",
+          "excessHoursStr": "4:44"
+        }
+      }
+    }
   ]
 }
