@@ -47,9 +47,9 @@ function formatMinutesToHHMM(totalMinutes) {
 }
 
 // ==========================================
-// 3. מחשבון איכילוב (עם תמיכה במספר מופעים, מיקומים ומקטעי ק"מ)
+// 3. מחשבון איכילוב (עם תמיכה במספר מופעים, מיקומים ומקטעי ק"מ וזמנים)
 // ==========================================
-function calculateIchilovAdvanced(showsTypesArray, kmSegmentsArray, totalMins) {
+function calculateIchilovAdvanced(showsTypesArray, kmSegmentsArray, timeSegmentsArray) {
     let basePay = 0;
     showsTypesArray.forEach(type => {
         basePay += (type === "ארוך") ? 840 : 670;
@@ -60,6 +60,11 @@ function calculateIchilovAdvanced(showsTypesArray, kmSegmentsArray, totalMins) {
         totalKm += (parseFloat(km) || 0);
     });
     const kmPay = totalKm * 0.5;
+
+    let totalMins = 0;
+    timeSegmentsArray.forEach(tMins => {
+        totalMins += (parseFloat(tMins) || 0);
+    });
 
     let excessMins = 0;
     let timePay = 0;
@@ -88,15 +93,11 @@ function renderIchilovDynamicFields(prefix = '') {
     const locationsContainer = document.getElementById(`${prefix}ichilov-locations-container`);
     const typesContainer = document.getElementById(`${prefix}ichilov-shows-types-container`);
     const kmContainer = document.getElementById(`${prefix}ichilov-km-container`);
-    const extraTimesContainer = document.getElementById(`${prefix}ichilov-extra-times-container`);
+    const timesContainer = document.getElementById(`${prefix}ichilov-times-container`);
 
-    if (!countSelect || !locationsContainer || !typesContainer || !kmContainer) return;
+    if (!countSelect || !locationsContainer || !typesContainer || !kmContainer || !timesContainer) return;
 
     const count = parseInt(countSelect.value, 10) || 1;
-
-    if (extraTimesContainer) {
-        extraTimesContainer.style.display = count > 1 ? 'block' : 'none';
-    }
 
     // שדות מיקום דינמיים
     let locationsHTML = '<strong>מיקום לכל אחד מהמופעים:</strong><div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">';
@@ -127,53 +128,173 @@ function renderIchilovDynamicFields(prefix = '') {
     typesHTML += '</div>';
     typesContainer.innerHTML = typesHTML;
 
-    // שדות קילומטראז' דינמיים מעודכנים לפי מקטעי הנסיעה המבוקשים
-    let kmHTML = '<strong>קילומטראז\' למקטעי המסלול (בק"מ):</strong><div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">';
+    // שדות קילומטראז' דינמיים לפי מקטעי המסלול המבוקשים
+    let kmHTML = '<strong>מרחקי נסיעה למקטעי המסלול (בק"מ):</strong><div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">';
     
     if (count === 1) {
         kmHTML += `
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בית - מופע ראשון (הלוך-חזור):</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה בית - מופע ראשון (הלוך-חזור):</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
     } else if (count === 2) {
         kmHTML += `
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בית - מופע ראשון:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה בית - מופע ראשון:</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע ראשון למופע שני:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה מופע ראשון - מופע שני:</label>
                 <input type="number" id="${prefix}ichilov-km-2" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מופע שני - חזור הביתה:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה מופע שני - חזרה הביתה:</label>
                 <input type="number" id="${prefix}ichilov-km-3" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
     } else if (count === 3) {
         kmHTML += `
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בית - מופע ראשון:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה בית - מופע ראשון:</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע ראשון למופע שני:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה מופע ראשון - מופע שני:</label>
                 <input type="number" id="${prefix}ichilov-km-2" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע שני לשלישי:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה מופע שני - מופע שלישי:</label>
                 <input type="number" id="${prefix}ichilov-km-3" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מופע שלישי - חזור הביתה:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה מופע שלישי - חזרה הביתה:</label>
                 <input type="number" id="${prefix}ichilov-km-4" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
     }
     kmHTML += '</div>';
     kmContainer.innerHTML = kmHTML;
+
+    // שדות זמני נסיעה דינמיים לפי מקטעים ותצוגה טורית (אנכית)
+    let timesHTML = '<strong>זמני נסיעה לפי מקטעים (שעות ודקות):</strong><div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">';
+
+    if (count === 1) {
+        timesHTML += `
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מהבית למופע ראשון (הלוך-חזור):</label>
+                <div class="time-inputs-grid">
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-hours-1" min="0" value="0" class="form-control ichilov-dynamic-time-h" required>
+                        <span class="time-sub-label">שעות</span>
+                    </div>
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-mins-1" min="0" max="59" value="0" class="form-control ichilov-dynamic-time-m" required>
+                        <span class="time-sub-label">דקות</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (count === 2) {
+        timesHTML += `
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מהבית למופע ראשון:</label>
+                <div class="time-inputs-grid">
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-hours-1" min="0" value="0" class="form-control ichilov-dynamic-time-h" required>
+                        <span class="time-sub-label">שעות</span>
+                    </div>
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-mins-1" min="0" max="59" value="0" class="form-control ichilov-dynamic-time-m" required>
+                        <span class="time-sub-label">דקות</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע ראשון ושני:</label>
+                <div class="time-inputs-grid">
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-hours-2" min="0" value="0" class="form-control ichilov-dynamic-time-h" required>
+                        <span class="time-sub-label">שעות</span>
+                    </div>
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-mins-2" min="0" max="59" value="0" class="form-control ichilov-dynamic-time-m" required>
+                        <span class="time-sub-label">דקות</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מהמופע האחרון חזרה הביתה:</label>
+                <div class="time-inputs-grid">
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-hours-3" min="0" value="0" class="form-control ichilov-dynamic-time-h" required>
+                        <span class="time-sub-label">שעות</span>
+                    </div>
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-mins-3" min="0" max="59" value="0" class="form-control ichilov-dynamic-time-m" required>
+                        <span class="time-sub-label">דקות</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (count === 3) {
+        timesHTML += `
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מהבית למופע ראשון:</label>
+                <div class="time-inputs-grid">
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-hours-1" min="0" value="0" class="form-control ichilov-dynamic-time-h" required>
+                        <span class="time-sub-label">שעות</span>
+                    </div>
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-mins-1" min="0" max="59" value="0" class="form-control ichilov-dynamic-time-m" required>
+                        <span class="time-sub-label">דקות</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע ראשון ושני:</label>
+                <div class="time-inputs-grid">
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-hours-2" min="0" value="0" class="form-control ichilov-dynamic-time-h" required>
+                        <span class="time-sub-label">שעות</span>
+                    </div>
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-mins-2" min="0" max="59" value="0" class="form-control ichilov-dynamic-time-m" required>
+                        <span class="time-sub-label">דקות</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע שני ושלישי:</label>
+                <div class="time-inputs-grid">
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-hours-3" min="0" value="0" class="form-control ichilov-dynamic-time-h" required>
+                        <span class="time-sub-label">שעות</span>
+                    </div>
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-mins-3" min="0" max="59" value="0" class="form-control ichilov-dynamic-time-m" required>
+                        <span class="time-sub-label">דקות</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מהמופע האחרון חזרה הביתה:</label>
+                <div class="time-inputs-grid">
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-hours-4" min="0" value="0" class="form-control ichilov-dynamic-time-h" required>
+                        <span class="time-sub-label">שעות</span>
+                    </div>
+                    <div class="time-input-wrap">
+                        <input type="number" id="${prefix}ichilov-mins-4" min="0" max="59" value="0" class="form-control ichilov-dynamic-time-m" required>
+                        <span class="time-sub-label">דקות</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    timesHTML += '</div>';
+    timesContainer.innerHTML = timesHTML;
 
     attachIchilovListeners(prefix);
 }
@@ -206,19 +327,15 @@ function gatherIchilovInputsData(prefix = '') {
         }
     }
 
-    const hoursThere = parseInt(document.getElementById(`${prefix}ichilov-hours-there`)?.value, 10) || 0;
-    const minsThere = parseInt(document.getElementById(`${prefix}ichilov-mins-there`)?.value, 10) || 0;
-    const timeThere = (hoursThere * 60) + minsThere;
-
-    const hoursBack = parseInt(document.getElementById(`${prefix}ichilov-hours-back`)?.value, 10) || 0;
-    const minsBack = parseInt(document.getElementById(`${prefix}ichilov-mins-back`)?.value, 10) || 0;
-    const timeBack = (hoursBack * 60) + minsBack;
-
-    const hoursTransfers = parseInt(document.getElementById(`${prefix}ichilov-hours-transfers`)?.value, 10) || 0;
-    const minsTransfers = parseInt(document.getElementById(`${prefix}ichilov-mins-transfers`)?.value, 10) || 0;
-    const timeTransfers = (hoursTransfers * 60) + minsTransfers;
-
-    const totalMins = timeThere + timeBack + timeTransfers;
+    const timeSegmentsArray = [];
+    const timeFieldsCount = (count === 1) ? 1 : (count + 1);
+    for (let i = 1; i <= timeFieldsCount; i++) {
+        const hEl = document.getElementById(`${prefix}ichilov-hours-${i}`);
+        const mEl = document.getElementById(`${prefix}ichilov-mins-${i}`);
+        const hrs = hEl ? parseInt(hEl.value, 10) || 0 : 0;
+        const mins = mEl ? parseInt(mEl.value, 10) || 0 : 0;
+        timeSegmentsArray.push((hrs * 60) + mins);
+    }
 
     const mainLocation = locationsArray.filter(Boolean).join(', ') || '';
 
@@ -228,16 +345,13 @@ function gatherIchilovInputsData(prefix = '') {
         mainLocation,
         showsTypesArray,
         kmSegmentsArray,
-        totalMins,
-        timeThere,
-        timeBack,
-        timeTransfers
+        timeSegmentsArray
     };
 }
 
 function updateIchilovPreviewUnified(prefix = '') {
     const data = gatherIchilovInputsData(prefix);
-    const calc = calculateIchilovAdvanced(data.showsTypesArray, data.kmSegmentsArray, data.totalMins);
+    const calc = calculateIchilovAdvanced(data.showsTypesArray, data.kmSegmentsArray, data.timeSegmentsArray);
 
     const previewEl = document.getElementById(prefix ? 'modal-calc-breakdown' : 'calc-breakdown');
     if (previewEl) {
@@ -391,7 +505,7 @@ function renderDashboard() {
 
             if (item.isIchilov && ichilovList) {
                 const iData = item.ichilovData || {};
-                const calc = iData.calcDetails || calculateIchilovAdvanced(iData.showsTypesArray || ['רגיל'], iData.kmSegmentsArray || [0], iData.totalMins || 0);
+                const calc = iData.calcDetails || calculateIchilovAdvanced(iData.showsTypesArray || ['רגיל'], iData.kmSegmentsArray || [0], iData.timeSegmentsArray || [0]);
 
                 const trI = document.createElement('tr');
                 trI.innerHTML = `
@@ -740,7 +854,7 @@ function setupIchilovModal() {
             const isPaid = document.getElementById('modal-ichilov-status').value === 'true';
 
             const inputData = gatherIchilovInputsData('modal-');
-            const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.totalMins);
+            const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.timeSegmentsArray);
             const monthKey = date.substring(0, 7);
 
             const showsTypesSummary = inputData.showsTypesArray.map((t, idx) => `מופע ${idx+1} (${t})`).join(', ');
@@ -760,10 +874,8 @@ function setupIchilovModal() {
                     showsTypesArray: inputData.showsTypesArray,
                     showsTypesSummary,
                     kmSegmentsArray: inputData.kmSegmentsArray,
-                    timeThere: inputData.timeThere,
-                    timeBack: inputData.timeBack,
-                    timeTransfers: inputData.timeTransfers,
-                    totalMins: inputData.totalMins,
+                    timeSegmentsArray: inputData.timeSegmentsArray,
+                    totalMins: calc.totalMins,
                     location: inputData.mainLocation,
                     calcDetails: calc
                 }
@@ -863,7 +975,7 @@ function setupForms() {
             const isPaid = document.getElementById('ichilov-status').value === 'true';
 
             const inputData = gatherIchilovInputsData('');
-            const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.totalMins);
+            const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.timeSegmentsArray);
             const monthKey = date.substring(0, 7);
 
             const showsTypesSummary = inputData.showsTypesArray.map((t, idx) => `מופע ${idx+1} (${t})`).join(', ');
@@ -883,10 +995,8 @@ function setupForms() {
                     showsTypesArray: inputData.showsTypesArray,
                     showsTypesSummary,
                     kmSegmentsArray: inputData.kmSegmentsArray,
-                    timeThere: inputData.timeThere,
-                    timeBack: inputData.timeBack,
-                    timeTransfers: inputData.timeTransfers,
-                    totalMins: inputData.totalMins,
+                    timeSegmentsArray: inputData.timeSegmentsArray,
+                    totalMins: calc.totalMins,
                     location: inputData.mainLocation,
                     calcDetails: calc
                 }
