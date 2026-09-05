@@ -128,10 +128,6 @@
                             <input type="date" id="ichilov-date" required>
                         </div>
                         <div class="form-group">
-                            <label for="ichilov-location">מיקום</label>
-                            <input type="text" id="ichilov-location" placeholder="הכנס מיקום" value="" required>
-                        </div>
-                        <div class="form-group">
                             <label for="ichilov-shows-count">כמות מופעים ביום</label>
                             <select id="ichilov-shows-count">
                                 <option value="1">מופע אחד</option>
@@ -139,6 +135,11 @@
                                 <option value="3">3 מופעים</option>
                             </select>
                         </div>
+                    </div>
+
+                    <!-- אזור הגדרת מיקומים דינמי -->
+                    <div id="ichilov-locations-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <!-- יתמלא דינמית בהתאם לכמות המופעים -->
                     </div>
 
                     <!-- אזור הגדרת סוגי מופעים דינמי -->
@@ -301,10 +302,6 @@
                         <input type="date" id="modal-ichilov-date" required>
                     </div>
                     <div class="form-group">
-                        <label for="modal-ichilov-location">מיקום</label>
-                        <input type="text" id="modal-ichilov-location" placeholder="הכנס מיקום" value="" required>
-                    </div>
-                    <div class="form-group">
                         <label for="modal-ichilov-shows-count">כמות מופעים ביום</label>
                         <select id="modal-ichilov-shows-count">
                             <option value="1">מופע אחד</option>
@@ -312,6 +309,10 @@
                             <option value="3">3 מופעים</option>
                         </select>
                     </div>
+                </div>
+
+                <div id="modal-ichilov-locations-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <!-- יתמלא דינמית במודאל -->
                 </div>
 
                 <div id="modal-ichilov-shows-types-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;">
