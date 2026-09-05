@@ -127,48 +127,47 @@ function renderIchilovDynamicFields(prefix = '') {
     typesHTML += '</div>';
     typesContainer.innerHTML = typesHTML;
 
-    // שדות קילומטראז' דינמיים - טור אנכי לבקשתך
+    // שדות קילומטראז' דינמיים מעודכנים לפי מקטעי הנסיעה המבוקשים
     let kmHTML = '<strong>קילומטראז\' למקטעי המסלול (בק"מ):</strong><div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">';
     
     if (count === 1) {
         kmHTML += `
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">ק"מ הלוך (יחושב כהלוך-חזור):</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בית - מופע ראשון (הלוך-חזור):</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
     } else if (count === 2) {
         kmHTML += `
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בית ➔ מופע 1:</label> <!-- שומר על תאימות -->
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">בית ➔ מופע 1:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בית - מופע ראשון:</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 1 ➔ מופע 2:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע ראשון למופע שני:</label>
                 <input type="number" id="${prefix}ichilov-km-2" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 2 ➔ הביתה:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מופע שני - חזור הביתה:</label>
                 <input type="number" id="${prefix}ichilov-km-3" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
     } else if (count === 3) {
         kmHTML += `
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">בית ➔ מופע 1:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בית - מופע ראשון:</label>
                 <input type="number" id="${prefix}ichilov-km-1" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 1 ➔ מופע 2:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע ראשון למופע שני:</label>
                 <input type="number" id="${prefix}ichilov-km-2" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 2 ➔ מופע 3:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה בין מופע שני לשלישי:</label>
                 <input type="number" id="${prefix}ichilov-km-3" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
             <div>
-                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מופע 3 ➔ הביתה:</label>
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">זמן נסיעה מופע שלישי - חזור הביתה:</label>
                 <input type="number" id="${prefix}ichilov-km-4" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="0">
             </div>
         `;
