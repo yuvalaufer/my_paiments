@@ -25,7 +25,7 @@ body {
 }
 
 .container {
-    max-width: 1250px; /* הרחבה לתצוגת טבלאות מרווחת ונוחה */
+    max-width: 1250px;
     margin: 0 auto;
 }
 
@@ -332,9 +332,9 @@ th {
     border-radius: 12px;
     width: 90%;
     max-width: 650px;
-    max-height: 85vh; /* מגביל את הגובה ומאפשר גלילה במובייל */
-    overflow-y: auto;  /* מפעיל פס גלילה פנימי */
-    -webkit-overflow-scrolling: touch; /* גלילה חלקה באייפון */
+    max-height: 85vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     position: relative;
     box-sizing: border-box;
 }
