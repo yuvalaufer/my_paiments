@@ -69,7 +69,7 @@
       "type": "1 מופעים",
       "location": "מרום הגליל",
       "amount": 915,
-      "isPaid": false,
+      "isPaid": true,
       "isIchilov": true,
       "ichilovData": {
         "showsCount": 1,
@@ -105,7 +105,7 @@
       "type": "1 מופעים",
       "location": "קריית אתא",
       "amount": 722,
-      "isPaid": false,
+      "isPaid": true,
       "isIchilov": true,
       "ichilovData": {
         "showsCount": 1,
