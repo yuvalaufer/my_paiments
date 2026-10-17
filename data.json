@@ -7,7 +7,7 @@
       "location": "עדנים",
       "date": "2026-07-01",
       "amount": 726,
-      "isPaid": false,
+      "isPaid": true,
       "isIchilov": true,
       "ichilovData": {
         "location": "עדנים",
@@ -32,7 +32,7 @@
       "location": "מבואות חרמון",
       "date": "2026-07-19",
       "amount": 1098,
-      "isPaid": false,
+      "isPaid": true,
       "isIchilov": true,
       "ichilovData": {
         "location": "מבואות חרמון",
