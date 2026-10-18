@@ -646,6 +646,83 @@ function renderIchilovTimeDetails(ichilovData, calc) {
 }
 
 // ==========================================
+// פירוט מרחקי נסיעה באיכילוב
+// ==========================================
+function renderIchilovKmDetails(ichilovData, calc) {
+    const count = getIchilovShowCount(ichilovData);
+    const kmArray = Array.isArray(ichilovData.kmSegmentsArray)
+        ? ichilovData.kmSegmentsArray.map(km => Number(km))
+        : [];
+
+    const totalKm = Number.isFinite(Number(calc.totalKm))
+        ? Number(calc.totalKm)
+        : (kmArray.reduce((sum, km) => sum + (Number.isFinite(km) ? km : 0), 0) ||
+            (Number(ichilovData.kmOneWay) || 0) * 2);
+
+    const kmText = `${totalKm.toLocaleString('he-IL')} ק״מ`;
+    const formatKm = km => `${km.toLocaleString('he-IL')} ק״מ`;
+    let rows = [];
+
+    if (
+        count === 1 &&
+        kmArray.length === 1 &&
+        Number.isFinite(kmArray[0])
+    ) {
+        // במופע בודד המרחק שהוזן הוא לכל כיוון,
+        // והנתון נשמר כסך הלוך וחזור.
+        const oneWay = kmArray[0] / 2;
+
+        rows = [
+            `מהבית למופע (לפי המרחק שהוזן): ${formatKm(oneWay)}`,
+            `מהמופע הביתה (לפי אותו מרחק): ${formatKm(oneWay)}`
+        ];
+
+    } else if (
+        count === 1 &&
+        ichilovData.kmOneWay != null &&
+        Number.isFinite(Number(ichilovData.kmOneWay))
+    ) {
+        // תמיכה ברשומות ישנות.
+        const oneWay = Number(ichilovData.kmOneWay);
+
+        rows = [
+            `מהבית למופע (לפי המרחק שהוזן): ${formatKm(oneWay)}`,
+            `מהמופע הביתה (לפי אותו מרחק): ${formatKm(oneWay)}`
+        ];
+
+    } else if (
+        count > 1 &&
+        kmArray.length === count + 1 &&
+        kmArray.every(Number.isFinite)
+    ) {
+        const labels = getIchilovTimeLabels(count);
+
+        rows = kmArray.map(
+            (km, index) => `${labels[index]}: ${formatKm(km)}`
+        );
+    }
+
+    if (rows.length === 0) {
+        return `<span>${escapePaymentHTML(kmText)}</span>`;
+    }
+
+    return `
+        <details class="travel-km-details">
+            <summary style="cursor:pointer;white-space:nowrap;color:var(--secondary-color);font-weight:bold;">
+                ${escapePaymentHTML(kmText)}
+            </summary>
+            <div style="min-width:180px;text-align:right;padding-top:8px;font-size:0.85rem;line-height:1.6;">
+                ${rows.map(row => `
+                    <div style="margin-bottom:4px;">
+                        ${escapePaymentHTML(row)}
+                    </div>
+                `).join('')}
+            </div>
+        </details>
+    `;
+}
+
+// ==========================================
 // תצוגת הטבלאות והסיכום הכספי
 // ==========================================
 
@@ -739,7 +816,7 @@ function renderDashboard() {
                     <td>${escapePaymentHTML(item.date || '')}</td>
                     <td>${escapePaymentHTML(displayLocation)}</td>
                     <td>${escapePaymentHTML(iData.showsTypesSummary || item.type || '')}</td>
-                    <td>${calc.totalKm || 0} ק"מ</td>
+                    <td>${renderIchilovKmDetails(iData, calc)}</td>
                     <td>${renderIchilovTimeDetails(iData, calc)}</td>
                     <td>₪${calc.basePay || 0}</td>
                     <td>₪${calc.kmPay || 0}</td>
@@ -1517,7 +1594,7 @@ window.editEvent = function(id) {
                        style="color:#a94442;margin-top:10px;">
                         ברשומה הישנה נשמר זמן נסיעה כולל
                         (${escapePaymentHTML(formatMinutesToHHMM(totalTime))})
-                        ללא חלוקה להלוך וחזור.
+                        ללא חלוקה להלוך ולחזור.
 
                         יש להזין את זמני הנסיעה
                         בנפרד לפני שמירת הרשומה.
@@ -1560,10 +1637,6 @@ window.editEvent = function(id) {
 
     modal.style.display = 'block';
 };
-
-// ==========================================
-// איסוף נתוני עריכת איכילוב
-// ==========================================
 
 function gatherEditedIchilov() {
     const count = Number(
@@ -2296,3 +2369,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadData();
 });
+
