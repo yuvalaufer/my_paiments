@@ -181,5 +181,87 @@
         }
       }
     }
+  ],
+  "2026-10": [
+    {
+      "id": 1792358236977,
+      "date": "2026-10-14",
+      "client": "החברה מאיכילוב",
+      "type": "1 מופעים",
+      "location": "בי\"ח בני ציון",
+      "amount": 722,
+      "isPaid": false,
+      "isIchilov": true,
+      "ichilovData": {
+        "showsCount": 1,
+        "locationsArray": [
+          "בי\"ח בני ציון"
+        ],
+        "showsTypesArray": [
+          "רגיל"
+        ],
+        "showsTypesSummary": "מופע 1 (רגיל)",
+        "kmSegmentsArray": [
+          104
+        ],
+        "timeSegmentsArray": [
+          45,
+          52
+        ],
+        "totalMins": 97,
+        "location": "בי\"ח בני ציון",
+        "calcDetails": {
+          "basePay": 670,
+          "kmPay": 52,
+          "timePay": 0,
+          "totalPay": 722,
+          "totalKm": 104,
+          "totalMins": 97,
+          "excessMins": 0,
+          "totalHoursStr": "1:37",
+          "excessHoursStr": "0:00"
+        }
+      }
+    },
+    {
+      "id": 1792358474811,
+      "date": "2026-10-18",
+      "client": "החברה מאיכילוב",
+      "type": "1 מופעים",
+      "location": "בי\"ח זיו צפת",
+      "amount": 847,
+      "isPaid": false,
+      "isIchilov": true,
+      "ichilovData": {
+        "showsCount": 1,
+        "locationsArray": [
+          "בי\"ח זיו צפת"
+        ],
+        "showsTypesArray": [
+          "רגיל"
+        ],
+        "showsTypesSummary": "מופע 1 (רגיל)",
+        "kmSegmentsArray": [
+          214
+        ],
+        "timeSegmentsArray": [
+          87,
+          92
+        ],
+        "totalMins": 179,
+        "location": "בי\"ח זיו צפת",
+        "calcDetails": {
+          "basePay": 670,
+          "kmPay": 107,
+          "timePay": 70,
+          "totalPay": 847,
+          "totalKm": 214,
+          "totalMins": 179,
+          "excessMins": 59,
+          "totalHoursStr": "2:59",
+          "excessHoursStr": "0:59"
+        }
+      }
+    }
   ]
 }
