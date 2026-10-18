@@ -194,7 +194,7 @@ function renderIchilovDynamicFields(prefix = '', existingData = null) {
             </div>
             <div>
                 <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה מופע ראשון - מופע שני:</label>
-                <input type="number" id="${prefix}ichilov-km-2" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="${km1}">
+                <input type="number" id="${prefix}ichilov-km-2" class="form-control ichilov-dynamic-km" min="0" step="0.1" placeholder="0" required value="${km2}">
             </div>
             <div>
                 <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 3px;">מרחק נסיעה מופע שני - מופע שלישי:</label>
@@ -597,41 +597,69 @@ function renderDashboard() {
                 const calc = iData.calcDetails || calculateIchilovAdvanced(iData.showsTypesArray || ['רגיל'], iData.kmSegmentsArray || [0], iData.timeSegmentsArray || [0]);
 
                 // בניית פירוט זמנים מתקדם ונקי ללחיצה
-                let timeSegmentsBreakdownHTML = '';
                 let timesArr = iData.timeSegmentsArray || [];
                 if (timesArr.length === 0 && (iData.timeThere || iData.timeBack)) {
                     timesArr = [parseTimeToMinutes(iData.timeThere) + parseTimeToMinutes(iData.timeBack)];
                 }
                 
-                let detailsLines = [];
+                let timeDetailsLines = [];
                 let showCount = iData.showsCount || (iData.showsTypesArray ? iData.showsTypesArray.length : 1);
                 
                 if (showCount === 1) {
-                    let halfM = Math.floor((timesArr[0] || 0) / 2);
                     let toM = timesArr[0] !== undefined ? timesArr[0] : (parseTimeToMinutes(iData.timeThere) + parseTimeToMinutes(iData.timeBack));
                     let h1 = Math.floor(toM/2), h2 = toM - Math.floor(toM/2);
-                    detailsLines.push(`מהבית למופע (הלוך): ${formatMinutesToHHMM(h1)}`);
-                    detailsLines.push(`מהמופע הביתה (חזור): ${formatMinutesToHHMM(h2)}`);
+                    timeDetailsLines.push(`מהבית למופע (הלוך): ${formatMinutesToHHMM(h1)}`);
+                    timeDetailsLines.push(`מהמופע הביתה (חזור): ${formatMinutesToHHMM(h2)}`);
                 } else {
                     for (let idx = 0; idx < timesArr.length; idx++) {
                         let mVal = timesArr[idx] || 0;
                         if (idx === 0) {
-                            detailsLines.push(`מהבית למופע הראשון: ${formatMinutesToHHMM(mVal)}`);
+                            timeDetailsLines.push(`מהבית למופע ראשון: ${formatMinutesToHHMM(mVal)}`);
                         } else if (idx < showCount) {
-                            detailsLines.push(`בין מופע ${idx} למופע ${idx+1}: ${formatMinutesToHHMM(mVal)}`);
+                            timeDetailsLines.push(`בין מופע ${idx} למופע ${idx+1}: ${formatMinutesToHHMM(mVal)}`);
                         } else {
-                            detailsLines.push(`מהמופע האחרון הביתה: ${formatMinutesToHHMM(mVal)}`);
+                            timeDetailsLines.push(`מהמופע האחרון הביתה: ${formatMinutesToHHMM(mVal)}`);
                         }
                     }
                 }
 
-                const collapseId = `ichilov-collapse-${item.id}`;
+                const timeCollapseId = `ichilov-time-collapse-${item.id}`;
                 const timeCellHTML = `
-                    <div style="cursor: pointer; color: var(--secondary-color); font-weight: bold;" onclick="window.toggleIchilovTimeDetails('${collapseId}')">
+                    <div style="cursor: pointer; color: var(--secondary-color); font-weight: bold;" onclick="window.toggleIchilovCollapse('${timeCollapseId}')">
                         ${calc.totalHoursStr || '0:00'} 🔽
                     </div>
-                    <div id="${collapseId}" style="display: none; margin-top: 6px; font-size: 0.85rem; background: #f8f9fa; padding: 6px; border-radius: 4px; border: 1px solid #ddd; text-align: right;">
-                        ${detailsLines.length > 0 ? detailsLines.join('<br>') : 'אין פירוט זמנים'}
+                    <div id="${timeCollapseId}" style="display: none; margin-top: 6px; font-size: 0.85rem; background: #f8f9fa; padding: 6px; border-radius: 4px; border: 1px solid #ddd; text-align: right;">
+                        ${timeDetailsLines.length > 0 ? timeDetailsLines.join('<br>') : 'אין פירוט זמנים'}
+                    </div>
+                `;
+
+                // בניית פירוט ק"מ מתקדם ונקי ללחיצה
+                let kmArr = iData.kmSegmentsArray || [];
+                let kmDetailsLines = [];
+                if (showCount === 1) {
+                    let totalKmVal = kmArr[0] !== undefined ? kmArr[0] : (iData.kmOneWay ? iData.kmOneWay * 2 : 0);
+                    let oneWayVal = totalKmVal / 2;
+                    kmDetailsLines.push(`מהבית למופע ובחזרה (הלוך-חזור): ${totalKmVal} ק"מ (${oneWayVal} לכיוון)`);
+                } else {
+                    for (let idx = 0; idx < kmArr.length; idx++) {
+                        let kmVal = kmArr[idx] || 0;
+                        if (idx === 0) {
+                            kmDetailsLines.push(`מהבית למופע ראשון: ${kmVal} ק"מ`);
+                        } else if (idx < showCount) {
+                            kmDetailsLines.push(`בין מופע ${idx} למופע ${idx+1}: ${kmVal} ק"מ`);
+                        } else {
+                            kmDetailsLines.push(`מהמופע האחרון הביתה: ${kmVal} ק"מ`);
+                        }
+                    }
+                }
+
+                const kmCollapseId = `ichilov-km-collapse-${item.id}`;
+                const kmCellHTML = `
+                    <div style="cursor: pointer; color: var(--secondary-color); font-weight: bold;" onclick="window.toggleIchilovCollapse('${kmCollapseId}')">
+                        ${calc.totalKm || 0} ק"מ 🔽
+                    </div>
+                    <div id="${kmCollapseId}" style="display: none; margin-top: 6px; font-size: 0.85rem; background: #f8f9fa; padding: 6px; border-radius: 4px; border: 1px solid #ddd; text-align: right;">
+                        ${kmDetailsLines.length > 0 ? kmDetailsLines.join('<br>') : 'אין פירוט מרחקים'}
                     </div>
                 `;
 
@@ -640,7 +668,7 @@ function renderDashboard() {
                     <td>${item.date || ''}</td>
                     <td>${displayLocation}</td>
                     <td>${iData.showsTypesSummary || item.type || ''}</td>
-                    <td>${calc.totalKm || 0} ק"מ</td>
+                    <td>${kmCellHTML}</td>
                     <td>${timeCellHTML}</td>
                     <td>₪${calc.basePay || 0}</td>
                     <td>₪${calc.kmPay || 0}</td>
@@ -673,7 +701,7 @@ function renderDashboard() {
     renderGlobalUnpaidTable();
 }
 
-window.toggleIchilovTimeDetails = function(collapseId) {
+window.toggleIchilovCollapse = function(collapseId) {
     const el = document.getElementById(collapseId);
     if (el) {
         el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
@@ -974,7 +1002,7 @@ function setupTabs() {
 }
 
 // ==========================================
-// 9. ניהול מודאל איכילוב מהטופס הראשי ועריכת רשומות (תיקון 2)
+// 9. ניהול מודאל איכילוב מהטופס הראשי ועריכת רשומות
 // ==========================================
 window.openEditModal = function(id) {
     const monthEvents = currentData[selectedMonth] || [];
@@ -984,456 +1012,4 @@ window.openEditModal = function(id) {
     if (item.isIchilov) {
         let modal = document.getElementById('edit-ichilov-modal');
         if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'edit-ichilov-modal';
-            modal.className = 'modal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 650px;">
-                    <span class="close-btn" id="close-edit-ichilov-modal">&times;</span>
-                    <h2>🏥 עריכת מופע איכילוב</h2>
-                    <form id="edit-ichilov-form-elem">
-                        <input type="hidden" id="edit-ichilov-id">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="edit-ichilov-date">תאריך המופע</label>
-                                <input type="date" id="edit-ichilov-date" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="edit-ichilov-shows-count">כמות מופעים ביום</label>
-                                <select id="edit-ichilov-shows-count">
-                                    <option value="1">מופע אחד</option>
-                                    <option value="2">2 מופעים</option>
-                                    <option value="3">3 מופעים</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div id="edit-ichilov-locations-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;"></div>
-                        <div id="edit-ichilov-shows-types-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;"></div>
-                        <div id="edit-ichilov-km-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;"></div>
-                        <div id="edit-ichilov-times-container" style="margin: 15px 0; padding: 12px; background: #fdfdfd; border: 1px solid #e0e0e0; border-radius: 8px;"></div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="edit-ichilov-status">סטטוס תשלום</label>
-                                <select id="edit-ichilov-status">
-                                    <option value="false">✗ טרם שולם</option>
-                                    <option value="true">✓ שולם</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div id="edit-ichilov-calc-preview" class="calc-preview" style="margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 6px;">
-                            <strong>חישוב משוער:</strong>
-                            <span id="edit-modal-calc-breakdown">הזן נתונים לצפייה בחישוב</span>
-                        </div>
-
-                        <div style="display: flex; gap: 10px;">
-                            <button type="submit" class="submit-btn ichilov-btn" style="flex: 2;">שמור שינויים</button>
-                            <button type="button" class="submit-btn" style="flex: 1; background: #6c757d;" onclick="document.getElementById('edit-ichilov-modal').style.display='none';">ביטול</button>
-                        </div>
-                    </form>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            document.getElementById('close-edit-ichilov-modal').onclick = () => { modal.style.display = 'none'; };
-
-            document.getElementById('edit-ichilov-form-elem').onsubmit = (e) => {
-                e.preventDefault();
-                const recordId = parseInt(document.getElementById('edit-ichilov-id').value, 10);
-                const newDate = document.getElementById('edit-ichilov-date').value;
-                const newStatus = document.getElementById('edit-ichilov-status').value === 'true';
-
-                const inputData = gatherIchilovInputsData('edit-');
-                const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.timeSegmentsArray);
-                const newMonthKey = newDate.substring(0, 7);
-                const showsTypesSummary = inputData.showsTypesArray.map((t, idx) => `מופע ${idx+1} (${t})`).join(', ');
-
-                let foundItem = null;
-                Object.keys(currentData).forEach(mKey => {
-                    if (Array.isArray(currentData[mKey])) {
-                        const idx = currentData[mKey].findIndex(el => el.id === recordId);
-                        if (idx !== -1) {
-                            foundItem = currentData[mKey].splice(idx, 1)[0];
-                        }
-                    }
-                });
-
-                if (foundItem) {
-                    foundItem.date = newDate;
-                    foundItem.amount = calc.totalPay;
-                    foundItem.isPaid = newStatus;
-                    foundItem.type = `${inputData.count} מופעים`;
-                    foundItem.location = inputData.mainLocation;
-                    foundItem.ichilovData = {
-                        showsCount: inputData.count,
-                        locationsArray: inputData.locationsArray,
-                        showsTypesArray: inputData.showsTypesArray,
-                        showsTypesSummary,
-                        kmSegmentsArray: inputData.kmSegmentsArray,
-                        timeSegmentsArray: inputData.timeSegmentsArray,
-                        totalMins: calc.totalMins,
-                        location: inputData.mainLocation,
-                        calcDetails: calc
-                    };
-
-                    if (!currentData[newMonthKey]) currentData[newMonthKey] = [];
-                    currentData[newMonthKey].push(foundItem);
-
-                    selectedMonth = newMonthKey;
-                    const mPicker = document.getElementById('month-select');
-                    if (mPicker) mPicker.value = selectedMonth;
-
-                    hasUnsavedChanges = true;
-                    renderDashboard();
-                    modal.style.display = 'none';
-                    showStatusMessage('מופע איכילוב עודכן בהצלחה! לחץ "שמור שינויים".');
-                }
-            };
-        }
-
-        document.getElementById('edit-ichilov-id').value = item.id;
-        document.getElementById('edit-ichilov-date').value = item.date;
-        document.getElementById('edit-ichilov-status').value = item.isPaid ? 'true' : 'false';
-        
-        const countSel = document.getElementById('edit-ichilov-shows-count');
-        const iData = item.ichilovData || {};
-        countSel.value = iData.showsCount || (iData.showsTypesArray ? iData.showsTypesArray.length : 1);
-
-        renderIchilovDynamicFields('edit-', iData);
-
-        const countSelectEl = document.getElementById('edit-ichilov-shows-count');
-        if (!countSelectEl.dataset.editListener) {
-            countSelectEl.dataset.editListener = 'true';
-            countSelectEl.addEventListener('change', () => {
-                renderIchilovDynamicFields('edit-', {
-                    showsCount: parseInt(countSelectEl.value, 10),
-                    locationsArray: gatherIchilovInputsData('edit-').locationsArray,
-                    showsTypesArray: gatherIchilovInputsData('edit-').showsTypesArray
-                });
-            });
-        }
-
-        modal.style.display = 'block';
-
-    } else {
-        let modal = document.getElementById('edit-regular-modal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'edit-regular-modal';
-            modal.className = 'modal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 500px;">
-                    <span class="close-btn" id="close-edit-regular-modal">&times;</span>
-                    <h2>✏️ עריכת רשומה</h2>
-                    <form id="edit-regular-form-elem">
-                        <input type="hidden" id="edit-regular-id">
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label>שם לקוח</label>
-                            <input type="text" id="edit-regular-client" class="form-control" required>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label>סוג עבודה</label>
-                            <input type="text" id="edit-regular-type" class="form-control" required>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label>מיקום</label>
-                            <input type="text" id="edit-regular-location" class="form-control">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label>תאריך</label>
-                            <input type="date" id="edit-regular-date" class="form-control" required>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label>סכום לתשלום (₪)</label>
-                            <input type="number" id="edit-regular-amount" class="form-control" min="0" step="any" required>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label>סטטוס תשלום</label>
-                            <select id="edit-regular-status" class="form-control">
-                                <option value="false">✗ טרם שולם</option>
-                                <option value="true">✓ שולם</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button type="submit" class="submit-btn" style="flex: 2;">שמור שינויים</button>
-                            <button type="button" class="submit-btn" style="flex: 1; background: #6c757d;" onclick="document.getElementById('edit-regular-modal').style.display='none';">ביטול</button>
-                        </div>
-                    </form>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            document.getElementById('close-edit-regular-modal').onclick = () => { modal.style.display = 'none'; };
-
-            document.getElementById('edit-regular-form-elem').onsubmit = (e) => {
-                e.preventDefault();
-                const recordId = parseInt(document.getElementById('edit-regular-id').value, 10);
-                const newClient = document.getElementById('edit-regular-client').value.trim();
-                const newType = document.getElementById('edit-regular-type').value.trim();
-                const newLocation = document.getElementById('edit-regular-location').value.trim();
-                const newDate = document.getElementById('edit-regular-date').value;
-                const newAmount = parseFloat(document.getElementById('edit-regular-amount').value) || 0;
-                const newStatus = document.getElementById('edit-regular-status').value === 'true';
-                const newMonthKey = newDate.substring(0, 7);
-
-                let foundItem = null;
-                Object.keys(currentData).forEach(mKey => {
-                    if (Array.isArray(currentData[mKey])) {
-                        const idx = currentData[mKey].findIndex(el => el.id === recordId);
-                        if (idx !== -1) {
-                            foundItem = currentData[mKey].splice(idx, 1)[0];
-                        }
-                    }
-                });
-
-                if (foundItem) {
-                    foundItem.client = newClient;
-                    foundItem.type = newType;
-                    foundItem.location = newLocation;
-                    foundItem.date = newDate;
-                    foundItem.amount = newAmount;
-                    foundItem.isPaid = newStatus;
-
-                    if (!currentData[newMonthKey]) currentData[newMonthKey] = [];
-                    currentData[newMonthKey].push(foundItem);
-
-                    selectedMonth = newMonthKey;
-                    const mPicker = document.getElementById('month-select');
-                    if (mPicker) mPicker.value = selectedMonth;
-
-                    hasUnsavedChanges = true;
-                    renderDashboard();
-                    modal.style.display = 'none';
-                    showStatusMessage('הרשומה עודכנה בהצלחה! לחץ "שמור שינויים".');
-                }
-            };
-        }
-
-        document.getElementById('edit-regular-id').value = item.id;
-        document.getElementById('edit-regular-client').value = item.client || '';
-        document.getElementById('edit-regular-type').value = item.type || '';
-        document.getElementById('edit-regular-location').value = item.location || '';
-        document.getElementById('edit-regular-date').value = item.date || '';
-        document.getElementById('edit-regular-amount').value = item.amount || 0;
-        document.getElementById('edit-regular-status').value = item.isPaid ? 'true' : 'false';
-
-        modal.style.display = 'block';
-    }
-};
-
-function setupIchilovModal() {
-    const modal = document.getElementById('ichilov-modal');
-    const closeBtn = document.getElementById('close-ichilov-modal');
-    const form = document.getElementById('modal-ichilov-form');
-
-    if (closeBtn && modal) {
-        closeBtn.onclick = () => { modal.style.display = 'none'; };
-    }
-
-    renderIchilovDynamicFields('modal-');
-
-    if (form) {
-        form.onsubmit = (e) => {
-            e.preventDefault();
-            const date = document.getElementById('modal-ichilov-date').value;
-            const isPaid = document.getElementById('modal-ichilov-status').value === 'true';
-
-            const inputData = gatherIchilovInputsData('modal-');
-            const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.timeSegmentsArray);
-            const monthKey = date.substring(0, 7);
-
-            const showsTypesSummary = inputData.showsTypesArray.map((t, idx) => `מופע ${idx+1} (${t})`).join(', ');
-
-            const newEvent = {
-                id: Date.now(),
-                date,
-                client: 'החברה מאיכילוב',
-                type: `${inputData.count} מופעים`,
-                location: inputData.mainLocation,
-                amount: calc.totalPay,
-                isPaid,
-                isIchilov: true,
-                ichilovData: {
-                    showsCount: inputData.count,
-                    locationsArray: inputData.locationsArray,
-                    showsTypesArray: inputData.showsTypesArray,
-                    showsTypesSummary,
-                    kmSegmentsArray: inputData.kmSegmentsArray,
-                    timeSegmentsArray: inputData.timeSegmentsArray,
-                    totalMins: calc.totalMins,
-                    location: inputData.mainLocation,
-                    calcDetails: calc
-                }
-            };
-
-            if (!currentData[monthKey]) currentData[monthKey] = [];
-            currentData[monthKey].push(newEvent);
-
-            hasUnsavedChanges = true;
-            renderDashboard();
-            form.reset();
-            renderIchilovDynamicFields('modal-');
-            if (modal) modal.style.display = 'none';
-            showStatusMessage('מופע איכילוב נוסף בהצלחה! לחץ "שמור שינויים".');
-        };
-    }
-}
-
-// ==========================================
-// 10. הוספת אירועים (כולל האזנה לבחירת איכילוב בטופס הראשי)
-// ==========================================
-function setupForms() {
-    const clientSelect = document.getElementById('client-select');
-    const newClientContainer = document.getElementById('new-client-container');
-
-    if (clientSelect && newClientContainer) {
-        clientSelect.addEventListener('change', (e) => {
-            const selectedVal = e.target.value;
-            if (selectedVal === 'החברה מאיכילוב') {
-                const ichilovModal = document.getElementById('ichilov-modal');
-                if (ichilovModal) {
-                    ichilovModal.style.display = 'block';
-                    clientSelect.value = "";
-                }
-            } else if (selectedVal === '__NEW__') {
-                newClientContainer.style.display = 'block';
-                document.getElementById('new-client-name').required = true;
-            } else {
-                newClientContainer.style.display = 'none';
-                document.getElementById('new-client-name').required = false;
-            }
-        });
-    }
-
-    const regularForm = document.getElementById('add-regular-form');
-    if (regularForm) {
-        regularForm.onsubmit = (e) => {
-            e.preventDefault();
-            
-            let client = clientSelect ? clientSelect.value : '';
-            if (client === '__NEW__') {
-                client = document.getElementById('new-client-name').value.trim();
-            }
-
-            if (!client) {
-                alert('אנא בחר או הכנס שם לקוח');
-                return;
-            }
-
-            const type = document.getElementById('job-type').value;
-            const location = document.getElementById('job-location').value;
-            const date = document.getElementById('job-date').value;
-            const amount = parseFloat(document.getElementById('job-amount').value) || 0;
-            const isPaid = document.getElementById('job-status').value === 'true';
-
-            const monthKey = date.substring(0, 7);
-
-            const newEvent = {
-                id: Date.now(),
-                date,
-                client,
-                type,
-                location,
-                amount,
-                isPaid,
-                isIchilov: false
-            };
-
-            if (!currentData[monthKey]) currentData[monthKey] = [];
-            currentData[monthKey].push(newEvent);
-
-            hasUnsavedChanges = true;
-            regularForm.reset();
-            if (newClientContainer) newClientContainer.style.display = 'none';
-            renderDashboard();
-            showStatusMessage('אירוע נוצר! לחץ "שמור שינויים" לעדכון הקובץ.');
-        };
-    }
-
-    renderIchilovDynamicFields('');
-
-    const ichilovForm = document.getElementById('add-ichilov-form');
-    if (ichilovForm) {
-        ichilovForm.onsubmit = (e) => {
-            e.preventDefault();
-            const date = document.getElementById('ichilov-date').value;
-            const isPaid = document.getElementById('ichilov-status').value === 'true';
-
-            const inputData = gatherIchilovInputsData('');
-            const calc = calculateIchilovAdvanced(inputData.showsTypesArray, inputData.kmSegmentsArray, inputData.timeSegmentsArray);
-            const monthKey = date.substring(0, 7);
-
-            const showsTypesSummary = inputData.showsTypesArray.map((t, idx) => `מופע ${idx+1} (${t})`).join(', ');
-
-            const newEvent = {
-                id: Date.now(),
-                date,
-                client: 'החברה מאיכילוב',
-                type: `${inputData.count} מופעים`,
-                location: inputData.mainLocation,
-                amount: calc.totalPay,
-                isPaid,
-                isIchilov: true,
-                ichilovData: {
-                    showsCount: inputData.count,
-                    locationsArray: inputData.locationsArray,
-                    showsTypesArray: inputData.showsTypesArray,
-                    showsTypesSummary,
-                    kmSegmentsArray: inputData.kmSegmentsArray,
-                    timeSegmentsArray: inputData.timeSegmentsArray,
-                    totalMins: calc.totalMins,
-                    location: inputData.mainLocation,
-                    calcDetails: calc
-                }
-            };
-
-            if (!currentData[monthKey]) currentData[monthKey] = [];
-            currentData[monthKey].push(newEvent);
-
-            hasUnsavedChanges = true;
-            renderDashboard();
-            ichilovForm.reset();
-            renderIchilovDynamicFields('');
-            updateIchilovPreviewUnified('');
-            showStatusMessage('מופע איכילוב נוסף! לחץ "שמור שינויים" לעדכון הקובץ.');
-        };
-    }
-}
-
-// ==========================================
-// 11. אתחול האפליקציה בטעינה
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    setupModal();
-    setupTabs();
-    setupForms();
-    setupIchilovModal();
-
-    // הגדרת תאריך נוכחי בשדות תאריך חדשים כברירת מחדל
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    ['job-date', 'ichilov-date', 'modal-ichilov-date'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && !el.value) el.value = todayStr;
-    });
-
-    const monthSelect = document.getElementById('month-select');
-    if (monthSelect) {
-        monthSelect.addEventListener('change', (e) => {
-            const newMonth = e.target.value;
-            
-            if (!newMonth) {
-                e.target.value = selectedMonth;
-                showStatusMessage('פעולת איפוס החודש בוטלה כדי למנוע היעלמות נתונים.', true);
-                return;
-            }
-
-            selectedMonth = newMonth;
-            renderDashboard();
-        });
-    }
-
-    loadData();
-});
+            modal = document.createElement('div
