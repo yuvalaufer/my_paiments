@@ -143,7 +143,7 @@
       "type": "2 מופעים",
       "location": "ליפתא ירושלים, בראון ים המלח",
       "amount": 1906,
-      "isPaid": false,
+      "isPaid": true,
       "isIchilov": true,
       "ichilovData": {
         "showsCount": 2,
